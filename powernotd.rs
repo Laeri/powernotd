@@ -58,9 +58,38 @@ fn reset_other_notifications(threshold_val: &u32, notified: &mut HashMap<u32, No
     }
 }
 
+/// notify if battery is fully charged
+fn check_notify_full_battery(current: &u32, last: &u32, is_full_notified: &mut bool) {
+    // if already notified then do nothing
+    if *is_full_notified {
+        return;
+    }
+
+    // if charge is decreasing do not notify again
+    if *last >= *current {
+        // if battery status is decreasing then we want to notify again if reaching full capacity
+        *is_full_notified = false;
+        return;
+    }
+    if *current == 100 {
+        send_message(
+            "Battery Status",
+            "Fully Charged 100%",
+            &Urgency::Normal,
+            None,
+        );
+        *is_full_notified = true;
+    }
+}
+
 fn main() {
     let sleep_time = time::Duration::from_secs(60);
     let mut last_battery_level: u32 = 100;
+
+    const CRITICAL_WAIT_TIME_SECS: u32 = 10000;
+
+    // notify once when battery is fully charged
+    let mut is_full_notified = false;
 
     let notifications = vec![
         Notification {
@@ -79,31 +108,31 @@ fn main() {
             level: 15,
             urgency: Urgency::Critical,
             notified: false,
-            time_secs: None,
+            time_secs: Some(CRITICAL_WAIT_TIME_SECS),
         },
         Notification {
             level: 10,
             urgency: Urgency::Critical,
             notified: false,
-            time_secs: None,
+            time_secs: Some(CRITICAL_WAIT_TIME_SECS),
         },
         Notification {
             level: 5,
             urgency: Urgency::Critical,
             notified: false,
-            time_secs: Some(10000),
+            time_secs: Some(CRITICAL_WAIT_TIME_SECS),
         },
         Notification {
             level: 2,
             urgency: Urgency::Critical,
             notified: false,
-            time_secs: Some(10000),
+            time_secs: Some(CRITICAL_WAIT_TIME_SECS),
         },
         Notification {
             level: 1,
             urgency: Urgency::Critical,
             notified: false,
-            time_secs: Some(100000),
+            time_secs: Some(CRITICAL_WAIT_TIME_SECS),
         },
     ];
 
@@ -134,6 +163,8 @@ fn main() {
             }
             reset_other_notifications(&threshold_val, &mut notified);
         }
+
+        check_notify_full_battery(&level, &last_battery_level, &mut is_full_notified);
 
         last_battery_level = level;
 
