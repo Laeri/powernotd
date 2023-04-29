@@ -2,13 +2,31 @@ mod cli;
 
 use crate::cli::Args;
 use clap::Parser;
-use notify_rust::Urgency;
+use powernotd::config;
 use powernotd::*;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::{thread, time};
+
+use powernotd::notification::Notification;
 
 fn main() {
     let args = Args::parse();
+
+    // these paths are required for reading power supply status
+    let required_paths = vec![
+        PathBuf::from("/sys/class/power_supply/BAT0/status"),
+        PathBuf::from("/sys/class/power_supply/BAT0/capacity"),
+    ];
+    for path in required_paths {
+        if !path.exists() {
+            eprintln!(
+                "Require file at path: {} order to read power status!",
+                path.to_string_lossy()
+            );
+            std::process::exit(1);
+        }
+    }
 
     if args.status_level {
         let current = get_current_power();
@@ -16,7 +34,7 @@ fn main() {
         return;
     }
 
-    if args.status_state {
+    if args.charging_state {
         let status = get_status_charging();
         println!("{}", status);
         return;
@@ -27,80 +45,34 @@ fn main() {
     let sleep_time = time::Duration::from_secs(60);
     let mut last_battery_level: u32 = 100;
 
-    const CRITICAL_WAIT_TIME_SECS: u32 = 10000;
+    let mut notified: HashMap<u32, Notification> = HashMap::new();
 
-    // notify once when battery is fully charged
-    let mut is_full_notified = false;
+    let mut config = match args.config_file {
+        Some(string) => {
+            let path = PathBuf::from(string);
+            config::get_specific_config(path)
+        }
+        None => config::get_or_create_config(),
+    };
 
-    let notifications = vec![
-        Notification {
-            level: 30,
-            urgency: Urgency::Low,
-            notified: false,
-            time_secs: None,
-        },
-        Notification {
-            level: 20,
-            urgency: Urgency::Normal,
-            notified: false,
-            time_secs: None,
-        },
-        Notification {
-            level: 15,
-            urgency: Urgency::Critical,
-            notified: false,
-            time_secs: Some(CRITICAL_WAIT_TIME_SECS),
-        },
-        Notification {
-            level: 10,
-            urgency: Urgency::Critical,
-            notified: false,
-            time_secs: Some(CRITICAL_WAIT_TIME_SECS),
-        },
-        Notification {
-            level: 5,
-            urgency: Urgency::Critical,
-            notified: false,
-            time_secs: Some(CRITICAL_WAIT_TIME_SECS),
-        },
-        Notification {
-            level: 2,
-            urgency: Urgency::Critical,
-            notified: false,
-            time_secs: Some(CRITICAL_WAIT_TIME_SECS),
-        },
-        Notification {
-            level: 1,
-            urgency: Urgency::Critical,
-            notified: false,
-            time_secs: Some(CRITICAL_WAIT_TIME_SECS),
-        },
-    ];
-
-    let mut notified = HashMap::new();
-
-    for notification in notifications {
+    for notification in config.notifications {
         notified.insert(notification.level, notification);
     }
 
     loop {
         let level = get_current_power();
-        println!("level {}", level.to_string());
         let current_threshold = find_lowest_threshold(level, &notified);
-        for (key, value) in &notified {
-            println!("{}: {:?}", key, value);
-        }
         if let Some(threshold_val) = current_threshold {
             if let Some(notification) = notified.get_mut(&threshold_val) {
                 if !notification.notified && level < last_battery_level {
-                    send_notification(&level, &notification);
+                    send_notification(&level, notification);
                     notification.notified = true;
                 }
             }
             reset_other_notifications(&threshold_val, &mut notified);
         }
 
-        check_notify_full_battery(&level, &last_battery_level, &mut is_full_notified);
+        check_notify_full_battery(&level, &last_battery_level, &mut config.full_notification);
 
         last_battery_level = level;
 
