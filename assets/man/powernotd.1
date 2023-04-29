@@ -1,0 +1,30 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH powernotd 1  "powernotd 0.1.0"
+.SH NAME
+powernotd \- Power notification daemon for linux that sends events according to according to the \*(AqDesktop Notification Specification\*(Aq to the user. Notifications are emitted when specific battery level thresholds are reached or when the battery is fully charged
+.SH SYNOPSIS
+\fBpowernotd\fR [\fB\-s\fR|\fB\-\-status\-level\fR] [\fB\-c\fR|\fB\-\-charging\-state\fR] [\fB\-f\fR|\fB\-\-config\-file\fR] [\fB\-n\fR|\fB\-\-notify\-now\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR]
+.SH DESCRIPTION
+Power notification daemon for linux that sends events according to according to the \*(AqDesktop Notification Specification\*(Aq to the user. Notifications are emitted when specific battery level thresholds are reached or when the battery is fully charged
+.SH OPTIONS
+.TP
+\fB\-s\fR, \fB\-\-status\-level\fR
+Print the current battery level to stdout then exit
+.TP
+\fB\-c\fR, \fB\-\-charging\-state\fR
+Print charging status \*(Aqcharging\*(Aq, \*(Aqdischarging\*(Aq, \*(Aqfull\*(Aq or \*(Aqunknown\*(Aq to stdout then exit
+.TP
+\fB\-f\fR, \fB\-\-config\-file\fR=\fICONFIG_FILE\fR
+Set config file path if needed, otherwise $XDG_CONFIG_HOME/powernotd/config.json is used
+.TP
+\fB\-n\fR, \fB\-\-notify\-now\fR
+Send desktop notification with current battery level then exit
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+\fB\-V\fR, \fB\-\-version\fR
+Print version
+.SH VERSION
+v0.1.0
