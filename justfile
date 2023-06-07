@@ -2,11 +2,9 @@ export SHELL_COMPLETIONS_DIR := "./pkg/assets/completions"
 export MANPAGES_DIR := "./pkg/assets/man"
 
 
-rustc-version := "1.69.0"
+rustc-version := "1.69.0-x86_64-unknown-linux-gnu"
 publish-registry := "crates.io"
 publish-features := ""
-
-#export RUSTFLAGS := "-C link-arg=-fuse-ld=lld -C target-cpu=native"
 
 cargo +args='':
     cargo {{args}}
