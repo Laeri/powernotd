@@ -89,33 +89,44 @@ The configuration file is Json and the following is the annotated default config
 Each entry in the `notifications` array contains a threshold for which a notification should be sent if the current power level drops
 beneath the threshold.
 
-```json
-...
-  notifications: [
-  {
-      "level": 15, // this is the threshold and a notification will be sent if the power drops below this level
-      "urgency": "Critical", // One of "Low", "Normal", "Critical". This is the urgency of the desktop notification standard and your notification display daemon might render them in different colors based on the urgency 
-      "time_secs": 10000, // Optional, how long the notification should stay active. If given it is passed along in the notification event, otherwise no time is passed and your notification display daemon will decide how long the notification stays active.
-      "title": "Battery Status", // Title which will be displayed in the message, you can provide any string template. If it contains '{}', the current power level will be inserted at this location 
-      "message": "{}%", // Message that will be displayed below the title. Also can contain '{}' and the current power level will be inserted.
-      "command": // Optional, if you want to run a specific command if the threshold is reached it can be given here as a string.
-    }
-    ...
-  ]
-...
+See the full default config file for some example values: 
+
+Single entry for a notification threshold within the notifications array:
+```
+      level:        number, this is the threshold and a notification will be sent if the power drops below this level
+
+      urgency:      string, one of "Low", "Normal", "Critical". 
+                    This is the urgency of the desktop notification standard and your 
+                    notification display daemon might render them in different colors based on the urgency 
+
+      time_secs:    number, optional, how long the notification should stay active in seconds. 
+                    If given it is passed along in the notification event, otherwise no time is passed and your 
+                    notification display daemon will decide how long the notification stays active.
+
+      title:        string, title which will be displayed in the message, you can provide any string template. 
+                    If it contains '{}', the current power level will be inserted at this location 
+                    
+      message:      string, message that will be displayed below the title. Also can contain '{}' and 
+                    the current power level will be inserted.
+      command:      string, optional, if you want to run a specific command if the threshold is reached 
+                    it can be given here as a string.
 ```
 
 Additionally, apart from the `notifications` array the config-file also has an entry for a notification that will be sent when the
 battery is fully charged.:
-```json
-  "full_notification": {
-    "urgency": "Low", // same as notification urgency
-    "enabled": true, // if set to false then no notification will be shown when fully charged
-    "title": "Battery Status", // same as notification title but no level will be inserted in the template
-    "message": "Fully Charged 100%" // same as notification message but no level will be inserted in the template
-  }
+
+```
+full_notification
+
+    urgency: same as notification urgency, one of "Low", "Normal", "Critical"
+    enabled: boolean, if set to false then no notification will be shown when fully charged
+    title: string, same as notification title but no level will be inserted in the template
+    message": string // same as notification message but no level will be inserted in the template
+  
 ```
 
+
+Full default configuration file:
 ```json
 {
   "notifications": [
