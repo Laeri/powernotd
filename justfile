@@ -4,7 +4,6 @@ export MANPAGES_DIR := "./pkg/assets/man"
 
 rustc-version := "1.69.0-x86_64-unknown-linux-gnu"
 publish-registry := "crates.io"
-publish-features := ""
 
 cargo +args='':
     cargo {{args}}
@@ -53,7 +52,6 @@ publish +args='': verify-clean-git verify-release-tag-does-not-exist pre-release
     sleep 0.25
     cargo +{{rustc-version}} publish \
         --registry {{publish-registry}} \
-        --features {{publish-features}} \
         --no-default-features {{args}}
     echo "adding git tag, now that EVERYTHING worked..."
     git tag "v$(just get-crate-version)"
