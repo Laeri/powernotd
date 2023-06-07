@@ -1,0 +1,13 @@
+[Unit]                                                                                                                                        
+Description=A power desktop notification event sending daemon
+Documentation=https://github.com/Laeri/powernotd
+Requires=dbus.service                                                                                                                         
+After=dbus.service                                                                                                                            
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/powernotd
+RestartSec=12
+
+[Install]
+WantedBy=multi-user.target
