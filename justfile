@@ -1,7 +1,8 @@
 export SHELL_COMPLETIONS_DIR := "./pkg/assets/completions"
 export MANPAGES_DIR := "./pkg/assets/man"
 
-rustc-version := "nightly"
+
+rustc-version := "1.69.0"
 publish-registry := "crates.io"
 publish-features := ""
 
