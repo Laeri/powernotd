@@ -29,7 +29,7 @@ pub struct Notification {
     // the urgency
     pub urgency: Urgency,
     // notified is true if for the given threshold a notification has been sent out already
-    #[serde(default)]
+    #[serde(default, skip_serializing)]
     pub notified: bool,
 
     // how long the notification is displayed
@@ -54,7 +54,7 @@ pub struct Notification {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BatteryFullNotification {
     pub urgency: Urgency,
-    #[serde(default)]
+    #[serde(default, skip_serializing)]
     pub notified: bool,
 
     #[serde(skip_serializing_if = "Option::is_none")]

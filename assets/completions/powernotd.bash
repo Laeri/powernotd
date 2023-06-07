@@ -19,7 +19,7 @@ _powernotd() {
 
     case "${cmd}" in
         powernotd)
-            opts="-s -c -f -n -h -V --status-level --charging-state --config-file --notify-now --help --version"
+            opts="-s -c -f -n -t -p -h -V --status-level --charging-state --config-file --notify-now --list-thresholds --show-config-path --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0

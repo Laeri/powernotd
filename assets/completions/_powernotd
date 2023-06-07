@@ -15,14 +15,18 @@ _powernotd() {
 
     local context curcontext="$curcontext" state line
     _arguments "${_arguments_options[@]}" \
-'-f+[Set config file path if needed, otherwise \$XDG_CONFIG_HOME/powernotd/config.json is used]:CONFIG_FILE: ' \
-'--config-file=[Set config file path if needed, otherwise \$XDG_CONFIG_HOME/powernotd/config.json is used]:CONFIG_FILE: ' \
-'-s[Print the current battery level to stdout then exit]' \
-'--status-level[Print the current battery level to stdout then exit]' \
+'-f+[Set config-file path if needed, otherwise \$XDG_CONFIG_HOME/powernotd/config.json is used]:CONFIG_FILE: ' \
+'--config-file=[Set config-file path if needed, otherwise \$XDG_CONFIG_HOME/powernotd/config.json is used]:CONFIG_FILE: ' \
+'-s[Print the current battery-level to stdout then exit]' \
+'--status-level[Print the current battery-level to stdout then exit]' \
 '-c[Print charging status '\''charging'\'', '\''discharging'\'', '\''full'\'' or '\''unknown'\'' to stdout then exit]' \
 '--charging-state[Print charging status '\''charging'\'', '\''discharging'\'', '\''full'\'' or '\''unknown'\'' to stdout then exit]' \
-'-n[Send desktop notification with current battery level then exit]' \
-'--notify-now[Send desktop notification with current battery level then exit]' \
+'-n[Send desktop notification with current battery-level then exit]' \
+'--notify-now[Send desktop notification with current battery-level then exit]' \
+'-t[List all notification thresholds in the format '\''a_1%, a_2%, ..., a_n%'\'' that are specified in the config-file]' \
+'--list-thresholds[List all notification thresholds in the format '\''a_1%, a_2%, ..., a_n%'\'' that are specified in the config-file]' \
+'-p[Display the path to the config-file]' \
+'--show-config-path[Display the path to the config-file]' \
 '-h[Print help]' \
 '--help[Print help]' \
 '-V[Print version]' \

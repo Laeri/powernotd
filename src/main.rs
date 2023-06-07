@@ -40,12 +40,11 @@ fn main() {
         return;
     }
 
-    if args.notify_now {}
-
-    let sleep_time = time::Duration::from_secs(60);
-    let mut last_battery_level: u32 = 100;
-
-    let mut notified: HashMap<u32, Notification> = HashMap::new();
+    if args.notify_now {
+        let current = get_current_power();
+        notify_now(&current);
+        return;
+    }
 
     let mut config = match args.config_file {
         Some(string) => {
@@ -54,6 +53,34 @@ fn main() {
         }
         None => config::get_or_create_config(),
     };
+
+    if args.list_thresholds {
+        let mut levels = config
+            .notifications
+            .iter()
+            .map(|notification| notification.level)
+            .collect::<Vec<u32>>();
+
+        levels.sort();
+
+        let output = levels
+            .iter()
+            .map(|level| format!("{}%", level))
+            .collect::<Vec<String>>();
+        println!("{}", &output.join(", "));
+        return;
+    }
+
+    if args.show_config_path {
+        let config_path = config::get_default_config_path();
+        println!("{}", config_path.unwrap_or_default().to_string_lossy());
+        return;
+    }
+
+    let sleep_time = time::Duration::from_secs(60);
+    let mut last_battery_level: u32 = 100;
+
+    let mut notified: HashMap<u32, Notification> = HashMap::new();
 
     for notification in config.notifications {
         notified.insert(notification.level, notification);

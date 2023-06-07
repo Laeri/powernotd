@@ -78,7 +78,7 @@ fn load_config_from_file(path: &PathBuf) -> Result<Config, Error> {
     }
 }
 
-fn get_default_config_path() -> Option<PathBuf> {
+pub fn get_default_config_path() -> Option<PathBuf> {
     let dir_result = get_config_dir()?;
     let file_path = dir_result.join(CONFIG_NAME);
     Some(file_path)

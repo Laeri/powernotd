@@ -115,6 +115,17 @@ pub fn send_notification(level: &u32, notification: &notification::Notification)
     }
 }
 
+pub fn notify_now(level: &u32) {
+    let percent = format!("{}%", level);
+    let default_wait_time = 10; // seconds
+    send_message(
+        "Battery Status",
+        &percent,
+        &Urgency::Normal,
+        Some(default_wait_time),
+    );
+}
+
 /// Find lowest threshold which has been passed with the current battery level
 pub fn find_lowest_threshold(
     current: u32,
