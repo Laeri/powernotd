@@ -1,5 +1,3 @@
-[![MIT License][license-shield]][license-url]
-
 # Powernotd
 
 Powernotd is a small battery-level desktop notification daemon for Linux/Unix written in Rust.
@@ -21,6 +19,12 @@ This file is polled every minute and the battery-level is compared with the thre
 
 This project was created to learn Rust and I needed desktop notifications after switching to the Arch operating system with the Hyprland display manager.
 
+## Who may use this
+If you use a minimal linux distribution and you do not have a full desktop environment configured but you use only a window manager such as
+i3, awesome, bspwm, hyprland, sway, ...
+A desktop environment usually has some kind of battery notification service integrated whereas a window manager usually doesn't.
+When I switched to Arch using Hyprland I needed such a notification service and therefore created this project.
+
 ## Prerequisites
 
 For powernotd to work you will need a Linux/Unix operating system that has the following files present:
@@ -34,15 +38,20 @@ or [dunst](https://github.com/dunst-project/dunst)
 
 ### Aur (Arch user repository)
 
-@TODO
+If you are on an arch linux based distribution you can install it from the [aur](https://aur.archlinux.org/packages/powernotd-bin)
+using any kind of aur-helper.
+For example
+`yay -S powernotd` or `paru -S powernotd`
 
 ### From Binaries
 
 Binaries are provided in the [releases section](https://github.com/Laeri/powernotd/releases)
 
-### Cargo / Crate
+### Cargo crate install 
 
 `cargo install powernotd`
+
+Make sure your `$PATH` variable contains `$HOME/.cargo/bin/` as cargo installs it's binaries there.
 
 ## Usage
 

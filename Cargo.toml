@@ -5,6 +5,7 @@ edition = "2021"
 authors = ["laeri@laeri.me"]
 readme = "README.md"
 repository = "https://github.com/Laeri/powernotd"
+homepage = "https://github.com/Laeri/powernotd"
 license = "MIT"
 keywords = ["battery", "notification", "daemon"]
 categories = ["command-line-utilities"]
