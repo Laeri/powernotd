@@ -45,8 +45,21 @@ package:
   cp -r $MANPAGES_DIR ./release
   cp -r $SHELL_COMPLETIONS_DIR ./release
 
+build_release: pre-release
+  cargo clean
+  cargo build --release --target x86_64-unknown-linux-gnu
+  mkdir ./target/release/full-release
+  cp -r pkg/assets/man ./target/release/full-release
+  cp -r pkg/assets/completions ./target/release/full-release
+  export VERSION=$(just get-crate-version)
+  export RELEASE_PACKAGE="./target/release/powernotd-${VERSION}-x86_64.tar.gz"
+  tar -czvf $RELEASE_PACKAGE -C target/release/full-release ./target/release/full-release/ 
+  md5sum $RELEASE_PACKAGE > ./target/release/powernotd-${VERSION}-checksum.md5
+
+
+
 # publish crate version to private registry
-publish +args='': verify-clean-git verify-release-tag-does-not-exist pre-release
+publish_crate +args='': verify-clean-git verify-release-tag-does-not-exist pre-release
     git push
     sleep 0.25
     cargo +{{rustc-version}} publish \
