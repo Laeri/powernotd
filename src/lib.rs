@@ -102,7 +102,7 @@ pub fn send_notification(level: &u32, notification: &notification::Notification)
         .clone()
         .unwrap_or("Battery Status".to_string());
     let message = notification.message.clone().unwrap_or("{}".to_string());
-    let percent = format!("{}%", level);
+    let percent = format!("{}", level);
 
     send_message(
         &title.replace("{}", &percent),
