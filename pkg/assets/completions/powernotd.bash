@@ -19,7 +19,7 @@ _powernotd() {
 
     case "${cmd}" in
         powernotd)
-            opts="-s -c -f -n -t -p -h -V --status-level --charging-state --config-file --notify-now --list-thresholds --show-config-path --help --version"
+            opts="-s -c -f -n -t -p -b -h -V --status-level --charging-state --config-file --notify-now --list-thresholds --show-config-path --battery --help --version"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
                 return 0
@@ -33,6 +33,14 @@ _powernotd() {
                     COMPREPLY=($(compgen -f "${cur}"))
                     return 0
                     ;;
+                --battery)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
+                -b)
+                    COMPREPLY=($(compgen -f "${cur}"))
+                    return 0
+                    ;;
                 *)
                     COMPREPLY=()
                     ;;
@@ -43,4 +51,8 @@ _powernotd() {
     esac
 }
 
-complete -F _powernotd -o bashdefault -o default powernotd
+if [[ "${BASH_VERSINFO[0]}" -eq 4 && "${BASH_VERSINFO[1]}" -ge 4 || "${BASH_VERSINFO[0]}" -gt 4 ]]; then
+    complete -F _powernotd -o nosort -o bashdefault -o default powernotd
+else
+    complete -F _powernotd -o bashdefault -o default powernotd
+fi

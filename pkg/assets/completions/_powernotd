@@ -14,9 +14,11 @@ _powernotd() {
     fi
 
     local context curcontext="$curcontext" state line
-    _arguments "${_arguments_options[@]}" \
+    _arguments "${_arguments_options[@]}" : \
 '-f+[Set config-file path if needed, otherwise \$XDG_CONFIG_HOME/powernotd/config.json is used]:CONFIG_FILE: ' \
 '--config-file=[Set config-file path if needed, otherwise \$XDG_CONFIG_HOME/powernotd/config.json is used]:CONFIG_FILE: ' \
+'-b+[Pass the battery such as '\''BAT1'\'' if your system has multiple and you do not want to use the default (BAT0). Check '\''/sys/class/power_supply/'\'' to see which batteries you have]:BATTERY: ' \
+'--battery=[Pass the battery such as '\''BAT1'\'' if your system has multiple and you do not want to use the default (BAT0). Check '\''/sys/class/power_supply/'\'' to see which batteries you have]:BATTERY: ' \
 '-s[Print the current battery-level to stdout then exit]' \
 '--status-level[Print the current battery-level to stdout then exit]' \
 '-c[Print charging status '\''charging'\'', '\''discharging'\'', '\''full'\'' or '\''unknown'\'' to stdout then exit]' \

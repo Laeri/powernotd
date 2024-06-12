@@ -6,9 +6,24 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::{collections::HashMap, process::Command};
 
+pub type Battery = str;
+
+pub const DEFAULT_BATTERY: &Battery = "BAT0";
+
+pub fn get_charging_status_path(battery: Option<&Battery>) -> String {
+    let battery = battery.as_deref().unwrap_or(DEFAULT_BATTERY);
+    format!("/sys/class/power_supply/{}/status", battery)
+}
+
+pub fn get_power_status_path(battery: Option<&Battery>) -> String {
+    let battery = battery.as_deref().unwrap_or(DEFAULT_BATTERY);
+    format!("/sys/class/power_supply/{}/capacity", battery)
+}
+
 /// Return the current battery level
-pub fn get_current_power() -> u32 {
-    let mut file = File::open("/sys/class/power_supply/BAT0/capacity").unwrap();
+pub fn get_current_power(battery: Option<&Battery>) -> u32 {
+    let power_status_path = get_power_status_path(battery);
+    let mut file = File::open(power_status_path).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
     contents.trim().parse().expect("failed to parse number")
@@ -36,8 +51,9 @@ impl ChargingStatus {
     }
 }
 
-pub fn get_status_charging() -> String {
-    let mut file = File::open("/sys/class/power_supply/BAT0/status").unwrap();
+pub fn get_status_charging(battery: Option<&Battery>) -> String {
+    let status_charging_path = get_charging_status_path(battery);
+    let mut file = File::open(status_charging_path).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
     match contents.trim() {
@@ -141,7 +157,7 @@ pub fn reset_other_notifications(
     threshold_val: &u32,
     notified: &mut HashMap<u32, notification::Notification>,
 ) {
-    for (key, mut notification) in notified.iter_mut() {
+    for (key, notification) in notified.iter_mut() {
         if *key != *threshold_val {
             notification.notified = false;
         }
