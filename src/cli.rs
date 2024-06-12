@@ -29,6 +29,11 @@ pub struct Args {
     /// Display the path to the config-file
     #[arg(short = 'p', long, default_value_t = false)]
     pub show_config_path: bool,
+
+    /// Pass the battery such as 'BAT1' if your system has multiple and you do not want to use the
+    /// default (BAT0). Check '/sys/class/power_supply/' to see which batteries you have.
+    #[arg(short = 'b', long)]
+    pub battery: Option<String>,
 }
 
 /// used within build.rs

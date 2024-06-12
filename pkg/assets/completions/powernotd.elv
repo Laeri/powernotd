@@ -20,6 +20,8 @@ set edit:completion:arg-completer[powernotd] = {|@words|
         &'powernotd'= {
             cand -f 'Set config-file path if needed, otherwise $XDG_CONFIG_HOME/powernotd/config.json is used'
             cand --config-file 'Set config-file path if needed, otherwise $XDG_CONFIG_HOME/powernotd/config.json is used'
+            cand -b 'Pass the battery such as ''BAT1'' if your system has multiple and you do not want to use the default (BAT0). Check ''/sys/class/power_supply/'' to see which batteries you have'
+            cand --battery 'Pass the battery such as ''BAT1'' if your system has multiple and you do not want to use the default (BAT0). Check ''/sys/class/power_supply/'' to see which batteries you have'
             cand -s 'Print the current battery-level to stdout then exit'
             cand --status-level 'Print the current battery-level to stdout then exit'
             cand -c 'Print charging status ''charging'', ''discharging'', ''full'' or ''unknown'' to stdout then exit'

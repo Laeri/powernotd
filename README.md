@@ -70,7 +70,7 @@ Check the service status with `systemctl status powernotd.service`.
 Man page entry which is also included in the release:
 
 ```
-Battery-level notification daemon for linux that sends events according to the 'Desktop Notification Specification' to the user. Notifications are emitted when specific battery-level thresholds are reached or when the battery is fully charged
+Powernotd is a battery-level notification daemon that sends notification using the xdg desktop notification standard.
 
 Usage: powernotd [OPTIONS]
 
@@ -81,9 +81,9 @@ Options:
   -n, --notify-now                 Send desktop notification with current battery-level then exit
   -t, --list-thresholds            List all notification thresholds in the format 'a_1%, a_2%, ..., a_n%' that are specified in the config-file
   -p, --show-config-path           Display the path to the config-file
+  -b, --battery <BATTERY>          Pass the battery such as 'BAT1' if your system has multiple and you do not want to use the default (BAT0). Check '/sys/class/power_supply/' to see which batteries you have
   -h, --help                       Print help
   -V, --version                    Print version
-
 ```
 
 ### Configuration file

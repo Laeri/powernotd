@@ -23,6 +23,8 @@ Register-ArgumentCompleter -Native -CommandName 'powernotd' -ScriptBlock {
         'powernotd' {
             [CompletionResult]::new('-f', 'f', [CompletionResultType]::ParameterName, 'Set config-file path if needed, otherwise $XDG_CONFIG_HOME/powernotd/config.json is used')
             [CompletionResult]::new('--config-file', 'config-file', [CompletionResultType]::ParameterName, 'Set config-file path if needed, otherwise $XDG_CONFIG_HOME/powernotd/config.json is used')
+            [CompletionResult]::new('-b', 'b', [CompletionResultType]::ParameterName, 'Pass the battery such as ''BAT1'' if your system has multiple and you do not want to use the default (BAT0). Check ''/sys/class/power_supply/'' to see which batteries you have')
+            [CompletionResult]::new('--battery', 'battery', [CompletionResultType]::ParameterName, 'Pass the battery such as ''BAT1'' if your system has multiple and you do not want to use the default (BAT0). Check ''/sys/class/power_supply/'' to see which batteries you have')
             [CompletionResult]::new('-s', 's', [CompletionResultType]::ParameterName, 'Print the current battery-level to stdout then exit')
             [CompletionResult]::new('--status-level', 'status-level', [CompletionResultType]::ParameterName, 'Print the current battery-level to stdout then exit')
             [CompletionResult]::new('-c', 'c', [CompletionResultType]::ParameterName, 'Print charging status ''charging'', ''discharging'', ''full'' or ''unknown'' to stdout then exit')
@@ -35,7 +37,7 @@ Register-ArgumentCompleter -Native -CommandName 'powernotd' -ScriptBlock {
             [CompletionResult]::new('--show-config-path', 'show-config-path', [CompletionResultType]::ParameterName, 'Display the path to the config-file')
             [CompletionResult]::new('-h', 'h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', 'help', [CompletionResultType]::ParameterName, 'Print help')
-            [CompletionResult]::new('-V', 'V', [CompletionResultType]::ParameterName, 'Print version')
+            [CompletionResult]::new('-V', 'V ', [CompletionResultType]::ParameterName, 'Print version')
             [CompletionResult]::new('--version', 'version', [CompletionResultType]::ParameterName, 'Print version')
             break
         }

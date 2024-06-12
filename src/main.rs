@@ -13,15 +13,17 @@ use powernotd::notification::Notification;
 fn main() {
     let args = Args::parse();
 
+    let battery: Option<&Battery> = args.battery.as_deref();
+
     // these paths are required for reading power supply status
     let required_paths = vec![
-        PathBuf::from("/sys/class/power_supply/BAT0/status"),
-        PathBuf::from("/sys/class/power_supply/BAT0/capacity"),
+        PathBuf::from(get_power_status_path(battery)),
+        PathBuf::from(get_charging_status_path(battery)),
     ];
     for path in required_paths {
         if !path.exists() {
             eprintln!(
-                "Require file at path: {} order to read power status!",
+                "Require file at path: {} order to read power status! If you have a different battery such as BAT1 pass it using the -b flag.",
                 path.to_string_lossy()
             );
             std::process::exit(1);
@@ -29,19 +31,19 @@ fn main() {
     }
 
     if args.status_level {
-        let current = get_current_power();
+        let current = get_current_power(battery);
         println!("{}%", current);
         return;
     }
 
     if args.charging_state {
-        let status = get_status_charging();
+        let status = get_status_charging(battery);
         println!("{}", status);
         return;
     }
 
     if args.notify_now {
-        let current = get_current_power();
+        let current = get_current_power(battery);
         notify_now(&current);
         return;
     }
@@ -87,7 +89,7 @@ fn main() {
     }
 
     loop {
-        let level = get_current_power();
+        let level = get_current_power(battery);
         let current_threshold = find_lowest_threshold(level, &notified);
         if let Some(threshold_val) = current_threshold {
             if let Some(notification) = notified.get_mut(&threshold_val) {
