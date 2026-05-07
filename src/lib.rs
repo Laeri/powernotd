@@ -1,7 +1,8 @@
 pub mod config;
 pub mod notification;
+pub mod upower;
 
-use notification::{BatteryFullNotification, Urgency};
+use notification::{BatteryFullNotification, ChargingHook, Urgency};
 use std::fs::File;
 use std::io::prelude::*;
 use std::{collections::HashMap, process::Command};
@@ -29,7 +30,7 @@ pub fn get_current_power(battery: Option<&Battery>) -> u32 {
     contents.trim().parse().expect("failed to parse number")
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum ChargingStatus {
     Charging,
     Discharging,
@@ -38,7 +39,7 @@ pub enum ChargingStatus {
 }
 
 impl ChargingStatus {
-    fn as_str(&self) -> &'static str {
+    pub fn as_str(&self) -> &'static str {
         match *self {
             ChargingStatus::Charging => "charging",
             ChargingStatus::Discharging => "discharging",
@@ -46,22 +47,31 @@ impl ChargingStatus {
             ChargingStatus::Unknown => "unknown",
         }
     }
-    fn as_string(&self) -> String {
+    pub fn as_string(&self) -> String {
         self.as_str().to_owned()
+    }
+
+    // Plug/unplug semantics: Charging and Full both mean "AC connected".
+    pub fn is_plugged_in(&self) -> bool {
+        matches!(self, ChargingStatus::Charging | ChargingStatus::Full)
     }
 }
 
-pub fn get_status_charging(battery: Option<&Battery>) -> String {
+pub fn get_charging_status(battery: Option<&Battery>) -> ChargingStatus {
     let status_charging_path = get_charging_status_path(battery);
     let mut file = File::open(status_charging_path).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
     match contents.trim() {
-        "Charging" => ChargingStatus::Charging.as_string(),
-        "Discharging" => ChargingStatus::Discharging.as_string(),
-        "Full" | "Not charging" => ChargingStatus::Full.as_string(),
-        _ => ChargingStatus::Unknown.as_string(),
+        "Charging" => ChargingStatus::Charging,
+        "Discharging" => ChargingStatus::Discharging,
+        "Full" | "Not charging" => ChargingStatus::Full,
+        _ => ChargingStatus::Unknown,
     }
+}
+
+pub fn get_status_charging(battery: Option<&Battery>) -> String {
+    get_charging_status(battery).as_string()
 }
 
 /// send a message using linux notify-send api
@@ -128,6 +138,31 @@ pub fn send_notification(level: &u32, notification: &notification::Notification)
     );
     if notification.command.is_some() {
         run_command(notification.command.as_ref().unwrap());
+    }
+}
+
+/// Fire a charging hook: optionally show a notification (if title or message is set) and
+/// optionally run a command. The current battery `level` is templated into '{}'.
+pub fn fire_charging_hook(level: u32, hook: &ChargingHook) {
+    if !hook.enabled {
+        return;
+    }
+    if hook.title.is_some() || hook.message.is_some() {
+        let title = hook
+            .title
+            .clone()
+            .unwrap_or_else(|| "Battery Status".to_string());
+        let message = hook.message.clone().unwrap_or_else(|| "{}%".to_string());
+        let percent = format!("{}", level);
+        send_message(
+            &title.replace("{}", &percent),
+            &message.replace("{}", &percent),
+            &hook.urgency,
+            hook.time_secs,
+        );
+    }
+    if let Some(cmd) = &hook.command {
+        run_command(cmd);
     }
 }
 
