@@ -12,13 +12,20 @@ pub type Battery = str;
 pub const DEFAULT_BATTERY: &Battery = "BAT0";
 
 pub fn get_charging_status_path(battery: Option<&Battery>) -> String {
-    let battery = battery.as_deref().unwrap_or(DEFAULT_BATTERY);
+    let battery = battery.unwrap_or(DEFAULT_BATTERY);
     format!("/sys/class/power_supply/{}/status", battery)
 }
 
 pub fn get_power_status_path(battery: Option<&Battery>) -> String {
-    let battery = battery.as_deref().unwrap_or(DEFAULT_BATTERY);
+    let battery = battery.unwrap_or(DEFAULT_BATTERY);
     format!("/sys/class/power_supply/{}/capacity", battery)
+}
+
+/// Pure parser: maps the contents of `/sys/class/power_supply/*/capacity`
+/// to a battery percentage. Trims whitespace and panics on malformed input
+/// to preserve the original sysfs-read behaviour.
+pub fn parse_power_level(s: &str) -> u32 {
+    s.trim().parse().expect("failed to parse number")
 }
 
 /// Return the current battery level
@@ -27,7 +34,7 @@ pub fn get_current_power(battery: Option<&Battery>) -> u32 {
     let mut file = File::open(power_status_path).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
-    contents.trim().parse().expect("failed to parse number")
+    parse_power_level(&contents)
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -57,17 +64,25 @@ impl ChargingStatus {
     }
 }
 
-pub fn get_charging_status(battery: Option<&Battery>) -> ChargingStatus {
-    let status_charging_path = get_charging_status_path(battery);
-    let mut file = File::open(status_charging_path).unwrap();
-    let mut contents = String::new();
-    file.read_to_string(&mut contents).unwrap();
-    match contents.trim() {
+/// Pure parser: maps the contents of `/sys/class/power_supply/*/status`
+/// to a [`ChargingStatus`]. Trims whitespace. "Not charging" is treated
+/// as Full because kernels report it once the battery hits a charge-stop
+/// threshold.
+pub fn parse_charging_status(s: &str) -> ChargingStatus {
+    match s.trim() {
         "Charging" => ChargingStatus::Charging,
         "Discharging" => ChargingStatus::Discharging,
         "Full" | "Not charging" => ChargingStatus::Full,
         _ => ChargingStatus::Unknown,
     }
+}
+
+pub fn get_charging_status(battery: Option<&Battery>) -> ChargingStatus {
+    let status_charging_path = get_charging_status_path(battery);
+    let mut file = File::open(status_charging_path).unwrap();
+    let mut contents = String::new();
+    file.read_to_string(&mut contents).unwrap();
+    parse_charging_status(&contents)
 }
 
 pub fn get_charging_status_text(battery: Option<&Battery>) -> String {
@@ -136,8 +151,8 @@ pub fn send_notification(level: &u32, notification: &notification::Notification)
         &notification.urgency,
         notification.time_secs,
     );
-    if notification.command.is_some() {
-        run_command(notification.command.as_ref().unwrap());
+    if let Some(cmd) = &notification.command {
+        run_command(cmd);
     }
 }
 
@@ -226,9 +241,346 @@ pub fn check_notify_full_battery(
         .unwrap_or("Fully Charged 100%".to_string());
     if *current >= 100 {
         send_message(&title, &message, &full_notification.urgency, None);
-        if full_notification.command.is_some() {
-            run_command(full_notification.command.as_ref().unwrap());
+        if let Some(cmd) = &full_notification.command {
+            run_command(cmd);
         }
         full_notification.notified = true;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::notification::{BatteryFullNotification, Notification, Urgency};
+
+    // ---- ChargingStatus enum --------------------------------------------
+
+    #[test]
+    fn charging_status_as_str_charging() {
+        assert_eq!(ChargingStatus::Charging.as_str(), "charging");
+    }
+
+    #[test]
+    fn charging_status_as_str_discharging() {
+        assert_eq!(ChargingStatus::Discharging.as_str(), "discharging");
+    }
+
+    #[test]
+    fn charging_status_as_str_full() {
+        assert_eq!(ChargingStatus::Full.as_str(), "full");
+    }
+
+    #[test]
+    fn charging_status_as_str_unknown() {
+        assert_eq!(ChargingStatus::Unknown.as_str(), "unknown");
+    }
+
+    #[test]
+    fn charging_status_as_string_returns_owned() {
+        assert_eq!(
+            ChargingStatus::Charging.as_string(),
+            String::from("charging")
+        );
+    }
+
+    #[test]
+    fn is_plugged_in_charging_true() {
+        assert!(ChargingStatus::Charging.is_plugged_in());
+    }
+
+    #[test]
+    fn is_plugged_in_full_true() {
+        assert!(ChargingStatus::Full.is_plugged_in());
+    }
+
+    #[test]
+    fn is_plugged_in_discharging_false() {
+        assert!(!ChargingStatus::Discharging.is_plugged_in());
+    }
+
+    #[test]
+    fn is_plugged_in_unknown_false() {
+        assert!(!ChargingStatus::Unknown.is_plugged_in());
+    }
+
+    // ---- parse_charging_status ------------------------------------------
+
+    #[test]
+    fn parse_charging_charging() {
+        assert_eq!(parse_charging_status("Charging"), ChargingStatus::Charging);
+    }
+
+    #[test]
+    fn parse_charging_discharging() {
+        assert_eq!(
+            parse_charging_status("Discharging"),
+            ChargingStatus::Discharging
+        );
+    }
+
+    #[test]
+    fn parse_charging_full() {
+        assert_eq!(parse_charging_status("Full"), ChargingStatus::Full);
+    }
+
+    #[test]
+    fn parse_charging_not_charging_alias() {
+        assert_eq!(parse_charging_status("Not charging"), ChargingStatus::Full);
+    }
+
+    #[test]
+    fn parse_charging_trims_trailing_newline() {
+        assert_eq!(
+            parse_charging_status("Charging\n"),
+            ChargingStatus::Charging
+        );
+    }
+
+    #[test]
+    fn parse_charging_trims_surrounding_whitespace() {
+        assert_eq!(parse_charging_status("  Full  \n"), ChargingStatus::Full);
+    }
+
+    #[test]
+    fn parse_charging_empty_is_unknown() {
+        assert_eq!(parse_charging_status(""), ChargingStatus::Unknown);
+    }
+
+    #[test]
+    fn parse_charging_whitespace_only_is_unknown() {
+        assert_eq!(parse_charging_status("\t \n"), ChargingStatus::Unknown);
+    }
+
+    #[test]
+    fn parse_charging_garbage_is_unknown() {
+        assert_eq!(parse_charging_status("banana"), ChargingStatus::Unknown);
+    }
+
+    #[test]
+    fn parse_charging_case_sensitive_lowercase_is_unknown() {
+        assert_eq!(parse_charging_status("charging"), ChargingStatus::Unknown);
+    }
+
+    // ---- parse_power_level ----------------------------------------------
+
+    #[test]
+    fn parse_power_level_zero() {
+        assert_eq!(parse_power_level("0"), 0);
+    }
+
+    #[test]
+    fn parse_power_level_full() {
+        assert_eq!(parse_power_level("100"), 100);
+    }
+
+    #[test]
+    fn parse_power_level_trims_newline() {
+        assert_eq!(parse_power_level("42\n"), 42);
+    }
+
+    #[test]
+    fn parse_power_level_trims_spaces() {
+        assert_eq!(parse_power_level("  77  "), 77);
+    }
+
+    #[test]
+    #[should_panic(expected = "failed to parse number")]
+    fn parse_power_level_panics_on_garbage() {
+        parse_power_level("abc");
+    }
+
+    #[test]
+    #[should_panic(expected = "failed to parse number")]
+    fn parse_power_level_panics_on_empty() {
+        parse_power_level("");
+    }
+
+    #[test]
+    #[should_panic(expected = "failed to parse number")]
+    fn parse_power_level_panics_on_negative() {
+        parse_power_level("-5");
+    }
+
+    // ---- Path helpers ---------------------------------------------------
+
+    #[test]
+    fn default_charging_status_path_uses_bat0() {
+        assert_eq!(
+            get_charging_status_path(None),
+            "/sys/class/power_supply/BAT0/status"
+        );
+    }
+
+    #[test]
+    fn explicit_charging_status_path_uses_battery_name() {
+        assert_eq!(
+            get_charging_status_path(Some("BAT1")),
+            "/sys/class/power_supply/BAT1/status"
+        );
+    }
+
+    #[test]
+    fn default_power_status_path_uses_bat0() {
+        assert_eq!(
+            get_power_status_path(None),
+            "/sys/class/power_supply/BAT0/capacity"
+        );
+    }
+
+    #[test]
+    fn explicit_power_status_path_uses_battery_name() {
+        assert_eq!(
+            get_power_status_path(Some("BAT2")),
+            "/sys/class/power_supply/BAT2/capacity"
+        );
+    }
+
+    // ---- find_lowest_threshold ------------------------------------------
+
+    fn mk_notification(level: u32) -> Notification {
+        Notification {
+            level,
+            urgency: Urgency::Low,
+            notified: false,
+            time_secs: None,
+            command: None,
+            title: None,
+            message: None,
+        }
+    }
+
+    fn notified_map(levels: &[u32]) -> HashMap<u32, Notification> {
+        let mut map = HashMap::new();
+        for &l in levels {
+            map.insert(l, mk_notification(l));
+        }
+        map
+    }
+
+    #[test]
+    fn lowest_threshold_empty_map_returns_none() {
+        let map = notified_map(&[]);
+        assert_eq!(find_lowest_threshold(50, &map), None);
+    }
+
+    #[test]
+    fn lowest_threshold_no_key_ge_current_returns_none() {
+        let map = notified_map(&[10, 20]);
+        assert_eq!(find_lowest_threshold(50, &map), None);
+    }
+
+    #[test]
+    fn lowest_threshold_single_match() {
+        let map = notified_map(&[30]);
+        assert_eq!(find_lowest_threshold(20, &map), Some(30));
+    }
+
+    #[test]
+    fn lowest_threshold_picks_smallest_ge_current() {
+        let map = notified_map(&[10, 20, 30, 80]);
+        assert_eq!(find_lowest_threshold(15, &map), Some(20));
+    }
+
+    #[test]
+    fn lowest_threshold_exact_match_wins() {
+        let map = notified_map(&[10, 20, 30]);
+        assert_eq!(find_lowest_threshold(20, &map), Some(20));
+    }
+
+    #[test]
+    fn lowest_threshold_all_keys_ge_current() {
+        let map = notified_map(&[50, 60, 70]);
+        assert_eq!(find_lowest_threshold(10, &map), Some(50));
+    }
+
+    // ---- reset_other_notifications --------------------------------------
+
+    fn notified_map_all_true(levels: &[u32]) -> HashMap<u32, Notification> {
+        let mut map = notified_map(levels);
+        for n in map.values_mut() {
+            n.notified = true;
+        }
+        map
+    }
+
+    #[test]
+    fn reset_clears_notified_on_others_only() {
+        let mut map = notified_map_all_true(&[10, 20, 30]);
+        reset_other_notifications(&20, &mut map);
+        assert!(!map.get(&10).unwrap().notified);
+        assert!(map.get(&20).unwrap().notified);
+        assert!(!map.get(&30).unwrap().notified);
+    }
+
+    #[test]
+    fn reset_threshold_not_in_map_flips_all() {
+        let mut map = notified_map_all_true(&[10, 20, 30]);
+        reset_other_notifications(&99, &mut map);
+        for n in map.values() {
+            assert!(!n.notified);
+        }
+    }
+
+    #[test]
+    fn reset_empty_map_no_panic() {
+        let mut map: HashMap<u32, Notification> = HashMap::new();
+        reset_other_notifications(&10, &mut map);
+        assert!(map.is_empty());
+    }
+
+    // ---- check_notify_full_battery (no-side-effect branches only) ------
+    //
+    // The `current >= 100` branch is intentionally NOT covered here; it
+    // calls send_message / run_command which require a live D-Bus session
+    // and a notification server. Manual smoke-test that path on a real
+    // desktop before release.
+
+    fn mk_full_notification() -> BatteryFullNotification {
+        BatteryFullNotification {
+            urgency: Urgency::Low,
+            notified: false,
+            time_secs: None,
+            enabled: true,
+            command: None,
+            title: Some("t".to_string()),
+            message: Some("m".to_string()),
+        }
+    }
+
+    #[test]
+    fn check_full_already_notified_short_circuits() {
+        let mut n = mk_full_notification();
+        n.notified = true;
+        check_notify_full_battery(&100, &99, &mut n);
+        assert!(n.notified, "should remain true");
+    }
+
+    #[test]
+    fn check_full_disabled_short_circuits() {
+        let mut n = mk_full_notification();
+        n.enabled = false;
+        check_notify_full_battery(&100, &99, &mut n);
+        assert!(!n.notified);
+    }
+
+    #[test]
+    fn check_full_decreasing_resets_notified_and_returns() {
+        let mut n = mk_full_notification();
+        check_notify_full_battery(&80, &90, &mut n);
+        assert!(!n.notified);
+    }
+
+    #[test]
+    fn check_full_equal_levels_is_decreasing() {
+        let mut n = mk_full_notification();
+        check_notify_full_battery(&80, &80, &mut n);
+        assert!(!n.notified);
+    }
+
+    #[test]
+    fn check_full_under_100_does_not_notify() {
+        let mut n = mk_full_notification();
+        check_notify_full_battery(&99, &98, &mut n);
+        assert!(!n.notified);
     }
 }

@@ -42,7 +42,105 @@ pub fn build_command() -> clap::Command {
     Args::command()
 }
 
-#[test]
-fn verify_app() {
-    build_command().debug_assert();
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::error::ErrorKind;
+
+    #[test]
+    fn verify_app() {
+        build_command().debug_assert();
+    }
+
+    #[test]
+    fn cli_parse_no_args_defaults() {
+        let a = Args::try_parse_from(["powernotd"]).expect("parse");
+        assert!(!a.status_level);
+        assert!(!a.charging_state);
+        assert!(!a.notify_now);
+        assert!(!a.list_thresholds);
+        assert!(!a.show_config_path);
+        assert!(a.config_file.is_none());
+        assert!(a.battery.is_none());
+    }
+
+    #[test]
+    fn cli_parse_status_level_short() {
+        let a = Args::try_parse_from(["powernotd", "-s"]).expect("parse");
+        assert!(a.status_level);
+    }
+
+    #[test]
+    fn cli_parse_status_level_long() {
+        let a = Args::try_parse_from(["powernotd", "--status-level"]).expect("parse");
+        assert!(a.status_level);
+    }
+
+    #[test]
+    fn cli_parse_charging_state_short() {
+        let a = Args::try_parse_from(["powernotd", "-c"]).expect("parse");
+        assert!(a.charging_state);
+    }
+
+    #[test]
+    fn cli_parse_notify_now_short() {
+        let a = Args::try_parse_from(["powernotd", "-n"]).expect("parse");
+        assert!(a.notify_now);
+    }
+
+    #[test]
+    fn cli_parse_list_thresholds_short() {
+        let a = Args::try_parse_from(["powernotd", "-t"]).expect("parse");
+        assert!(a.list_thresholds);
+    }
+
+    #[test]
+    fn cli_parse_show_config_path_short() {
+        let a = Args::try_parse_from(["powernotd", "-p"]).expect("parse");
+        assert!(a.show_config_path);
+    }
+
+    #[test]
+    fn cli_parse_config_file_short() {
+        let a = Args::try_parse_from(["powernotd", "-f", "/tmp/x.json"]).expect("parse");
+        assert_eq!(a.config_file.as_deref(), Some("/tmp/x.json"));
+    }
+
+    #[test]
+    fn cli_parse_battery_short() {
+        let a = Args::try_parse_from(["powernotd", "-b", "BAT1"]).expect("parse");
+        assert_eq!(a.battery.as_deref(), Some("BAT1"));
+    }
+
+    #[test]
+    fn cli_parse_combined_t_and_f() {
+        let a = Args::try_parse_from(["powernotd", "-t", "-f", "/x.json"]).expect("parse");
+        assert!(a.list_thresholds);
+        assert_eq!(a.config_file.as_deref(), Some("/x.json"));
+    }
+
+    #[test]
+    fn cli_parse_combined_b_and_s() {
+        let a = Args::try_parse_from(["powernotd", "-b", "BAT1", "-s"]).expect("parse");
+        assert!(a.status_level);
+        assert_eq!(a.battery.as_deref(), Some("BAT1"));
+    }
+
+    #[test]
+    fn cli_parse_unknown_flag_errors() {
+        let res = Args::try_parse_from(["powernotd", "--bogus"]);
+        assert!(res.is_err());
+    }
+
+    #[test]
+    fn cli_parse_help_flag_returns_display_help_kind() {
+        let err = Args::try_parse_from(["powernotd", "--help"]).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::DisplayHelp);
+    }
+
+    #[test]
+    fn cli_parse_version_flag_returns_display_version_kind() {
+        let err = Args::try_parse_from(["powernotd", "--version"]).unwrap_err();
+        assert_eq!(err.kind(), ErrorKind::DisplayVersion);
+    }
 }
