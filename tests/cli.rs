@@ -83,6 +83,17 @@ fn show_config_path_prints_a_path() {
 }
 
 #[test]
+fn emit_default_config_prints_json_without_battery_files() {
+    powernotd()
+        .arg("--emit-default-config")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("\"notifications\""))
+        .stdout(predicate::str::contains("\"full_notification\""))
+        .stdout(predicate::str::contains("\"poll_interval_secs\": 60"));
+}
+
+#[test]
 fn unknown_flag_fails() {
     powernotd()
         .arg("--no-such-flag")

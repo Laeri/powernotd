@@ -14,10 +14,39 @@ fn default_poll_interval_secs() -> u32 {
     DEFAULT_POLL_INTERVAL_SECS
 }
 
+fn default_plugged_in_startup_show_full() -> bool {
+    true
+}
+
+fn default_plugged_in_startup_show_threshold() -> bool {
+    false
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+pub struct PluggedInStartupNotification {
+    #[serde(default = "default_plugged_in_startup_show_full")]
+    pub show_full: bool,
+
+    #[serde(default = "default_plugged_in_startup_show_threshold")]
+    pub show_threshold: bool,
+}
+
+impl Default for PluggedInStartupNotification {
+    fn default() -> Self {
+        Self {
+            show_full: default_plugged_in_startup_show_full(),
+            show_threshold: default_plugged_in_startup_show_threshold(),
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     pub notifications: Vec<Notification>,
     pub full_notification: BatteryFullNotification,
+
+    #[serde(default)]
+    pub plugged_in_startup_notification: PluggedInStartupNotification,
 
     // Optional hook fired when the AC adapter is plugged in
     // (Discharging -> Charging or Discharging -> Full).
@@ -232,6 +261,7 @@ pub fn get_default_config() -> Config {
         command: None,
         title: Some("Charging".to_string()),
         message: Some("Plugged in at {}%".to_string()),
+        show_threshold_warning: false,
     };
 
     let charging_stop = ChargingHook {
@@ -241,11 +271,13 @@ pub fn get_default_config() -> Config {
         command: None,
         title: Some("Discharging".to_string()),
         message: Some("Unplugged at {}%".to_string()),
+        show_threshold_warning: true,
     };
 
     Config {
         notifications,
         full_notification,
+        plugged_in_startup_notification: PluggedInStartupNotification::default(),
         charging_start: Some(charging_start),
         charging_stop: Some(charging_stop),
         poll_interval_secs: DEFAULT_POLL_INTERVAL_SECS,
@@ -296,6 +328,21 @@ mod tests {
         assert_eq!(cfg.poll_interval_secs, DEFAULT_POLL_INTERVAL_SECS);
         assert!(cfg.charging_start.is_none());
         assert!(cfg.charging_stop.is_none());
+        assert!(cfg.plugged_in_startup_notification.show_full);
+        assert!(!cfg.plugged_in_startup_notification.show_threshold);
+    }
+
+    #[test]
+    fn load_config_from_file_partial_plugged_in_startup_applies_defaults() {
+        let json = r#"{
+          "notifications": [],
+          "full_notification": {"urgency": "Low", "enabled": false},
+          "plugged_in_startup_notification": {"show_threshold": true}
+        }"#;
+        let f = write_tmp(json);
+        let cfg = load_config_from_file(&f.path().to_path_buf()).expect("load ok");
+        assert!(cfg.plugged_in_startup_notification.show_full);
+        assert!(cfg.plugged_in_startup_notification.show_threshold);
     }
 
     #[test]
@@ -372,12 +419,32 @@ mod tests {
         let stop = cfg.charging_stop.expect("charging_stop present");
         assert!(!start.enabled);
         assert!(!stop.enabled);
+        assert!(!start.show_threshold_warning);
+        assert!(stop.show_threshold_warning);
     }
 
     #[test]
     fn get_default_config_poll_interval_is_60() {
         let cfg = get_default_config();
         assert_eq!(cfg.poll_interval_secs, 60);
+    }
+
+    #[test]
+    fn get_default_config_plugged_in_startup_notification_defaults() {
+        let cfg = get_default_config();
+        assert!(cfg.plugged_in_startup_notification.show_full);
+        assert!(!cfg.plugged_in_startup_notification.show_threshold);
+    }
+
+    #[test]
+    fn get_default_config_serde_roundtrip_preserves_show_threshold_warning() {
+        let cfg = get_default_config();
+        let s = serde_json::to_string(&cfg).expect("serialize default config");
+        let back: Config = serde_json::from_str(&s).expect("deserialize default config");
+        let start = back.charging_start.expect("charging_start present");
+        let stop = back.charging_stop.expect("charging_stop present");
+        assert!(!start.show_threshold_warning);
+        assert!(stop.show_threshold_warning);
     }
 
     #[test]

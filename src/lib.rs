@@ -2,6 +2,7 @@ pub mod config;
 pub mod notification;
 pub mod upower;
 
+use config::PluggedInStartupNotification;
 use notification::{BatteryFullNotification, ChargingHook, Urgency};
 use std::fs::File;
 use std::io::prelude::*;
@@ -245,6 +246,58 @@ pub fn reset_other_notifications(
     }
 }
 
+pub fn should_notify_threshold_on_startup(
+    charging_status: ChargingStatus,
+    config: PluggedInStartupNotification,
+) -> bool {
+    !charging_status.is_plugged_in() || config.show_threshold
+}
+
+pub fn should_notify_full_on_startup(
+    current: u32,
+    charging_status: ChargingStatus,
+    config: PluggedInStartupNotification,
+) -> bool {
+    current >= 100 && charging_status.is_plugged_in() && config.show_full
+}
+
+pub fn should_notify_threshold_on_unplug(
+    previous: ChargingStatus,
+    current: ChargingStatus,
+    show_threshold_warning: bool,
+) -> bool {
+    show_threshold_warning
+        && previous.is_plugged_in()
+        && matches!(current, ChargingStatus::Discharging)
+}
+
+pub fn send_full_battery_notification(full_notification: &mut BatteryFullNotification) {
+    if full_notification.notified || !full_notification.enabled {
+        return;
+    }
+
+    let title = full_notification
+        .title
+        .clone()
+        .unwrap_or("Battery Status".to_string());
+    let message = full_notification
+        .message
+        .clone()
+        .unwrap_or("Fully Charged 100%".to_string());
+    if let Err(err) = send_message(
+        &title,
+        &message,
+        &full_notification.urgency,
+        full_notification.time_secs,
+    ) {
+        warn_notification_failure(&err);
+    }
+    if let Some(cmd) = &full_notification.command {
+        run_command(cmd);
+    }
+    full_notification.notified = true;
+}
+
 /// notify if battery is fully charged
 pub fn check_notify_full_battery(
     current: &u32,
@@ -263,28 +316,15 @@ pub fn check_notify_full_battery(
         return;
     }
 
-    let title = full_notification
-        .title
-        .clone()
-        .unwrap_or("Battery Status".to_string());
-    let message = full_notification
-        .message
-        .clone()
-        .unwrap_or("Fully Charged 100%".to_string());
     if *current >= 100 {
-        if let Err(err) = send_message(&title, &message, &full_notification.urgency, None) {
-            warn_notification_failure(&err);
-        }
-        if let Some(cmd) = &full_notification.command {
-            run_command(cmd);
-        }
-        full_notification.notified = true;
+        send_full_battery_notification(full_notification);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::PluggedInStartupNotification;
     use crate::notification::{BatteryFullNotification, Notification, Urgency};
 
     // ---- ChargingStatus enum --------------------------------------------
@@ -560,6 +600,119 @@ mod tests {
         let mut map: HashMap<u32, Notification> = HashMap::new();
         reset_other_notifications(&10, &mut map);
         assert!(map.is_empty());
+    }
+
+    // ---- startup notification gating ------------------------------------
+
+    fn plugged_startup(show_full: bool, show_threshold: bool) -> PluggedInStartupNotification {
+        PluggedInStartupNotification {
+            show_full,
+            show_threshold,
+        }
+    }
+
+    #[test]
+    fn startup_threshold_disallowed_when_plugged_in_by_default() {
+        assert!(!should_notify_threshold_on_startup(
+            ChargingStatus::Charging,
+            PluggedInStartupNotification::default()
+        ));
+        assert!(!should_notify_threshold_on_startup(
+            ChargingStatus::Full,
+            PluggedInStartupNotification::default()
+        ));
+    }
+
+    #[test]
+    fn startup_threshold_allowed_when_discharging() {
+        assert!(should_notify_threshold_on_startup(
+            ChargingStatus::Discharging,
+            PluggedInStartupNotification::default()
+        ));
+    }
+
+    #[test]
+    fn startup_threshold_can_be_enabled_when_plugged_in() {
+        assert!(should_notify_threshold_on_startup(
+            ChargingStatus::Charging,
+            plugged_startup(true, true)
+        ));
+    }
+
+    #[test]
+    fn startup_full_allowed_when_plugged_in_and_full_by_default() {
+        assert!(should_notify_full_on_startup(
+            100,
+            ChargingStatus::Full,
+            PluggedInStartupNotification::default()
+        ));
+    }
+
+    #[test]
+    fn startup_full_can_be_disabled_when_plugged_in() {
+        assert!(!should_notify_full_on_startup(
+            100,
+            ChargingStatus::Full,
+            plugged_startup(false, false)
+        ));
+    }
+
+    #[test]
+    fn startup_full_requires_full_level_and_plugged_in_state() {
+        assert!(!should_notify_full_on_startup(
+            99,
+            ChargingStatus::Full,
+            PluggedInStartupNotification::default()
+        ));
+        assert!(!should_notify_full_on_startup(
+            100,
+            ChargingStatus::Discharging,
+            PluggedInStartupNotification::default()
+        ));
+    }
+
+    // ---- unplug notification gating -------------------------------------
+
+    #[test]
+    fn unplug_threshold_warning_enabled_for_plugged_to_discharging() {
+        assert!(should_notify_threshold_on_unplug(
+            ChargingStatus::Charging,
+            ChargingStatus::Discharging,
+            true
+        ));
+        assert!(should_notify_threshold_on_unplug(
+            ChargingStatus::Full,
+            ChargingStatus::Discharging,
+            true
+        ));
+    }
+
+    #[test]
+    fn unplug_threshold_warning_can_be_disabled() {
+        assert!(!should_notify_threshold_on_unplug(
+            ChargingStatus::Charging,
+            ChargingStatus::Discharging,
+            false
+        ));
+    }
+
+    #[test]
+    fn unplug_threshold_warning_requires_real_unplug_transition() {
+        assert!(!should_notify_threshold_on_unplug(
+            ChargingStatus::Charging,
+            ChargingStatus::Full,
+            true
+        ));
+        assert!(!should_notify_threshold_on_unplug(
+            ChargingStatus::Discharging,
+            ChargingStatus::Discharging,
+            true
+        ));
+        assert!(!should_notify_threshold_on_unplug(
+            ChargingStatus::Charging,
+            ChargingStatus::Unknown,
+            true
+        ));
     }
 
     // ---- check_notify_full_battery (no-side-effect branches only) ------

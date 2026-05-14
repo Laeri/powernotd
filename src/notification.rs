@@ -1,6 +1,10 @@
 use notify_rust::Urgency as SendUrgency;
 use serde::{Deserialize, Serialize};
 
+fn default_show_threshold_warning() -> bool {
+    true
+}
+
 #[derive(Eq, PartialEq, Hash, Copy, Clone, Debug, Deserialize, Serialize)]
 pub enum Urgency {
     /// The behaviour for `Low` urgency depends on the notification server.
@@ -73,6 +77,16 @@ pub struct ChargingHook {
     // optional notification message; '{}' is replaced with the current battery level.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+
+    // Only consulted on the `charging_stop` hook (i.e. when the AC adapter is
+    // unplugged): show the matching threshold warning on unplug if the current
+    // battery level is already below a configured threshold. On `charging_start`
+    // this field is parsed but ignored — by the time plug-in fires, any
+    // relevant threshold warning has already either fired during the preceding
+    // discharge or did not apply. Kept on the shared `ChargingHook` type so the
+    // config format stays uniform.
+    #[serde(default = "default_show_threshold_warning")]
+    pub show_threshold_warning: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -249,6 +263,7 @@ mod tests {
             command: Some("xset dpms force on".to_string()),
             title: Some("Charging".to_string()),
             message: Some("Plugged in at {}%".to_string()),
+            show_threshold_warning: true,
         };
         let s = serde_json::to_string(&h).unwrap();
         let back: ChargingHook = serde_json::from_str(&s).unwrap();
@@ -258,6 +273,7 @@ mod tests {
         assert_eq!(back.command.as_deref(), Some("xset dpms force on"));
         assert_eq!(back.title.as_deref(), Some("Charging"));
         assert_eq!(back.message.as_deref(), Some("Plugged in at {}%"));
+        assert!(back.show_threshold_warning);
     }
 
     #[test]
@@ -270,6 +286,7 @@ mod tests {
         assert!(back.command.is_none());
         assert!(back.title.is_none());
         assert!(back.message.is_none());
+        assert!(back.show_threshold_warning);
     }
 
     #[test]
@@ -281,12 +298,51 @@ mod tests {
             command: None,
             title: None,
             message: None,
+            show_threshold_warning: false,
         };
         let s = serde_json::to_string(&h).unwrap();
         assert!(!s.contains("command"), "got: {s}");
         assert!(!s.contains("title"), "got: {s}");
         assert!(!s.contains("message"), "got: {s}");
         assert!(!s.contains("time_secs"), "got: {s}");
+    }
+
+    #[test]
+    fn charging_hook_show_threshold_warning_false_survives_roundtrip() {
+        let h = ChargingHook {
+            urgency: Urgency::Low,
+            enabled: false,
+            time_secs: None,
+            command: None,
+            title: None,
+            message: None,
+            show_threshold_warning: false,
+        };
+        let s = serde_json::to_string(&h).unwrap();
+        let back: ChargingHook = serde_json::from_str(&s).unwrap();
+        assert!(!back.show_threshold_warning);
+    }
+
+    #[test]
+    fn charging_hook_show_threshold_warning_always_serialized() {
+        let h = ChargingHook {
+            urgency: Urgency::Low,
+            enabled: false,
+            time_secs: None,
+            command: None,
+            title: None,
+            message: None,
+            show_threshold_warning: false,
+        };
+        let s = serde_json::to_string(&h).unwrap();
+        assert!(s.contains("\"show_threshold_warning\":false"), "got: {s}");
+    }
+
+    #[test]
+    fn charging_hook_minimal_json_defaults_show_threshold_warning_to_true() {
+        let json = r#"{"urgency":"Low","enabled":false}"#;
+        let back: ChargingHook = serde_json::from_str(json).unwrap();
+        assert!(back.show_threshold_warning);
     }
 
     // ---- BatteryFullNotification serde ----------------------------------
