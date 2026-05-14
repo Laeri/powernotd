@@ -32,6 +32,7 @@ set edit:completion:arg-completer[powernotd] = {|@words|
             cand --list-thresholds 'List all notification thresholds in the format ''a_1%, a_2%, ..., a_n%'' that are specified in the config-file'
             cand -p 'Display the path to the config-file'
             cand --show-config-path 'Display the path to the config-file'
+            cand --mute-notification-warning 'Suppress the stderr warning printed when no desktop notification daemon (dunst, mako, notification-daemon, xfce4-notifyd, ...) is reachable on D-Bus. Notifications still attempt to fire; this only silences the diagnostic'
             cand -h 'Print help'
             cand --help 'Print help'
             cand -V 'Print version'
