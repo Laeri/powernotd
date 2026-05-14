@@ -87,7 +87,7 @@ pub fn get_or_create_config() -> Config {
     }
 }
 
-fn load_config_from_file(path: &PathBuf) -> Result<Config, Error> {
+pub fn load_config_from_file(path: &PathBuf) -> Result<Config, Error> {
     let text = std::fs::read_to_string(path)?;
     match serde_json::from_str::<Config>(&text) {
         Ok(config) => Ok(config),
@@ -146,7 +146,7 @@ fn get_config_dir() -> Option<PathBuf> {
     ProjectDirs::from("me", "laeri", "powernotd").map(|dir| dir.config_dir().to_owned())
 }
 
-fn get_default_config() -> Config {
+pub fn get_default_config() -> Config {
     let default_title = "Battery Status";
     let default_message = "{}%";
     let notifications = vec![
@@ -249,5 +249,169 @@ fn get_default_config() -> Config {
         charging_start: Some(charging_start),
         charging_stop: Some(charging_stop),
         poll_interval_secs: DEFAULT_POLL_INTERVAL_SECS,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::notification::Urgency;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    fn write_tmp(contents: &str) -> NamedTempFile {
+        let mut f = NamedTempFile::new().expect("create tempfile");
+        f.write_all(contents.as_bytes()).expect("write tempfile");
+        f.flush().expect("flush tempfile");
+        f
+    }
+
+    // ---- load_config_from_file -----------------------------------------
+
+    #[test]
+    fn load_config_from_file_valid_json() {
+        let json = r#"{
+          "notifications": [
+            {"level": 25, "urgency": "Low"},
+            {"level": 10, "urgency": "Critical"}
+          ],
+          "full_notification": {"urgency": "Low", "enabled": true},
+          "poll_interval_secs": 30
+        }"#;
+        let f = write_tmp(json);
+        let cfg = load_config_from_file(&f.path().to_path_buf()).expect("load ok");
+        assert_eq!(cfg.notifications.len(), 2);
+        assert_eq!(cfg.poll_interval_secs, 30);
+        assert!(cfg.full_notification.enabled);
+    }
+
+    #[test]
+    fn load_config_from_file_minimal_applies_defaults() {
+        let json = r#"{
+          "notifications": [],
+          "full_notification": {"urgency": "Low", "enabled": false}
+        }"#;
+        let f = write_tmp(json);
+        let cfg = load_config_from_file(&f.path().to_path_buf()).expect("load ok");
+        assert_eq!(cfg.poll_interval_secs, DEFAULT_POLL_INTERVAL_SECS);
+        assert!(cfg.charging_start.is_none());
+        assert!(cfg.charging_stop.is_none());
+    }
+
+    #[test]
+    fn load_config_from_file_custom_poll_interval() {
+        let json = r#"{
+          "notifications": [],
+          "full_notification": {"urgency": "Low", "enabled": false},
+          "poll_interval_secs": 5
+        }"#;
+        let f = write_tmp(json);
+        let cfg = load_config_from_file(&f.path().to_path_buf()).expect("load ok");
+        assert_eq!(cfg.poll_interval_secs, 5);
+    }
+
+    #[test]
+    fn load_config_from_file_malformed_json_errors() {
+        let f = write_tmp("{ not json");
+        let err = load_config_from_file(&f.path().to_path_buf()).unwrap_err();
+        assert!(matches!(err, Error::LoadConfigError));
+    }
+
+    #[test]
+    fn load_config_from_file_missing_path_errors() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let missing = dir.path().join("does-not-exist.json");
+        let err = load_config_from_file(&missing).unwrap_err();
+        assert!(matches!(err, Error::LoadConfigError));
+    }
+
+    // ---- get_specific_config fallback ----------------------------------
+
+    #[test]
+    fn get_specific_config_falls_back_on_malformed() {
+        let f = write_tmp("{ not json");
+        let cfg = get_specific_config(f.path().to_path_buf());
+        assert_eq!(cfg.notifications.len(), 7);
+    }
+
+    #[test]
+    fn get_specific_config_falls_back_on_missing_path() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let missing = dir.path().join("missing.json");
+        let cfg = get_specific_config(missing);
+        assert_eq!(cfg.notifications.len(), 7);
+    }
+
+    // ---- get_default_config sanity -------------------------------------
+
+    #[test]
+    fn get_default_config_has_seven_thresholds() {
+        let cfg = get_default_config();
+        assert_eq!(cfg.notifications.len(), 7);
+    }
+
+    #[test]
+    fn get_default_config_threshold_levels_match() {
+        let cfg = get_default_config();
+        let mut levels: Vec<u32> = cfg.notifications.iter().map(|n| n.level).collect();
+        levels.sort();
+        assert_eq!(levels, vec![1, 2, 5, 10, 15, 20, 30]);
+    }
+
+    #[test]
+    fn get_default_config_full_notification_enabled() {
+        let cfg = get_default_config();
+        assert!(cfg.full_notification.enabled);
+        assert!(!cfg.full_notification.notified);
+    }
+
+    #[test]
+    fn get_default_config_charging_hooks_present_but_disabled() {
+        let cfg = get_default_config();
+        let start = cfg.charging_start.expect("charging_start present");
+        let stop = cfg.charging_stop.expect("charging_stop present");
+        assert!(!start.enabled);
+        assert!(!stop.enabled);
+    }
+
+    #[test]
+    fn get_default_config_poll_interval_is_60() {
+        let cfg = get_default_config();
+        assert_eq!(cfg.poll_interval_secs, 60);
+    }
+
+    #[test]
+    fn get_default_config_critical_levels_have_wait_time() {
+        let cfg = get_default_config();
+        for n in &cfg.notifications {
+            match n.level {
+                15 | 10 | 5 | 2 | 1 => assert_eq!(
+                    n.time_secs,
+                    Some(CRITICAL_WAIT_TIME_SECS),
+                    "level {} should have critical wait time",
+                    n.level
+                ),
+                30 | 20 => assert_eq!(
+                    n.time_secs, None,
+                    "level {} should have no wait time",
+                    n.level
+                ),
+                other => panic!("unexpected default level {}", other),
+            }
+        }
+    }
+
+    #[test]
+    fn get_default_config_urgencies_at_expected_levels() {
+        let cfg = get_default_config();
+        let by_level: std::collections::HashMap<u32, Urgency> = cfg
+            .notifications
+            .iter()
+            .map(|n| (n.level, n.urgency))
+            .collect();
+        assert_eq!(by_level.get(&30).copied(), Some(Urgency::Low));
+        assert_eq!(by_level.get(&20).copied(), Some(Urgency::Normal));
+        assert_eq!(by_level.get(&15).copied(), Some(Urgency::Critical));
+        assert_eq!(by_level.get(&1).copied(), Some(Urgency::Critical));
     }
 }

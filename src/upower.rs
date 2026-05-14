@@ -10,6 +10,7 @@ const UPOWER_DEST: &str = "org.freedesktop.UPower";
 const UPOWER_DEVICE_IFACE: &str = "org.freedesktop.UPower.Device";
 const UPOWER_DEVICE_PATH_PREFIX: &str = "/org/freedesktop/UPower/devices/battery_";
 
+#[derive(Debug, PartialEq, Eq)]
 enum UPowerState {
     Unknown,
     Charging,
@@ -142,4 +143,99 @@ pub fn try_spawn_listener(
     });
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ---- UPowerState::from_raw ------------------------------------------
+
+    #[test]
+    fn upower_state_from_raw_unknown_0() {
+        assert_eq!(UPowerState::from_raw(0), UPowerState::Unknown);
+    }
+
+    #[test]
+    fn upower_state_from_raw_charging_1() {
+        assert_eq!(UPowerState::from_raw(1), UPowerState::Charging);
+    }
+
+    #[test]
+    fn upower_state_from_raw_discharging_2() {
+        assert_eq!(UPowerState::from_raw(2), UPowerState::Discharging);
+    }
+
+    #[test]
+    fn upower_state_from_raw_empty_3() {
+        assert_eq!(UPowerState::from_raw(3), UPowerState::Empty);
+    }
+
+    #[test]
+    fn upower_state_from_raw_fully_charged_4() {
+        assert_eq!(UPowerState::from_raw(4), UPowerState::FullyCharged);
+    }
+
+    #[test]
+    fn upower_state_from_raw_pending_charge_5() {
+        assert_eq!(UPowerState::from_raw(5), UPowerState::PendingCharge);
+    }
+
+    #[test]
+    fn upower_state_from_raw_pending_discharge_6() {
+        assert_eq!(UPowerState::from_raw(6), UPowerState::PendingDischarge);
+    }
+
+    #[test]
+    fn upower_state_from_raw_seven_is_unknown() {
+        assert_eq!(UPowerState::from_raw(7), UPowerState::Unknown);
+    }
+
+    #[test]
+    fn upower_state_from_raw_large_is_unknown() {
+        assert_eq!(UPowerState::from_raw(u32::MAX), UPowerState::Unknown);
+    }
+
+    // ---- map_upower_state -----------------------------------------------
+
+    #[test]
+    fn map_upower_state_unknown_0() {
+        assert_eq!(map_upower_state(0), ChargingStatus::Unknown);
+    }
+
+    #[test]
+    fn map_upower_state_charging_1() {
+        assert_eq!(map_upower_state(1), ChargingStatus::Charging);
+    }
+
+    #[test]
+    fn map_upower_state_discharging_2() {
+        assert_eq!(map_upower_state(2), ChargingStatus::Discharging);
+    }
+
+    #[test]
+    fn map_upower_state_empty_3_is_unknown() {
+        assert_eq!(map_upower_state(3), ChargingStatus::Unknown);
+    }
+
+    #[test]
+    fn map_upower_state_fully_charged_4() {
+        assert_eq!(map_upower_state(4), ChargingStatus::Full);
+    }
+
+    #[test]
+    fn map_upower_state_pending_charge_5_is_charging() {
+        assert_eq!(map_upower_state(5), ChargingStatus::Charging);
+    }
+
+    #[test]
+    fn map_upower_state_pending_discharge_6_is_discharging() {
+        assert_eq!(map_upower_state(6), ChargingStatus::Discharging);
+    }
+
+    #[test]
+    fn map_upower_state_out_of_range_is_unknown() {
+        assert_eq!(map_upower_state(7), ChargingStatus::Unknown);
+        assert_eq!(map_upower_state(u32::MAX), ChargingStatus::Unknown);
+    }
 }

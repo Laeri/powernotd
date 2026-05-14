@@ -98,3 +98,247 @@ pub struct BatteryFullNotification {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ---- Urgency -> notify_rust::Urgency ---------------------------------
+
+    #[test]
+    fn urgency_into_notify_rust_low() {
+        assert!(matches!(SendUrgency::from(&Urgency::Low), SendUrgency::Low));
+    }
+
+    #[test]
+    fn urgency_into_notify_rust_normal() {
+        assert!(matches!(
+            SendUrgency::from(&Urgency::Normal),
+            SendUrgency::Normal
+        ));
+    }
+
+    #[test]
+    fn urgency_into_notify_rust_critical() {
+        assert!(matches!(
+            SendUrgency::from(&Urgency::Critical),
+            SendUrgency::Critical
+        ));
+    }
+
+    // ---- Urgency serde ---------------------------------------------------
+
+    #[test]
+    fn urgency_serializes_as_named_variant_low() {
+        assert_eq!(serde_json::to_string(&Urgency::Low).unwrap(), "\"Low\"");
+    }
+
+    #[test]
+    fn urgency_serializes_as_named_variant_normal() {
+        assert_eq!(
+            serde_json::to_string(&Urgency::Normal).unwrap(),
+            "\"Normal\""
+        );
+    }
+
+    #[test]
+    fn urgency_serializes_as_named_variant_critical() {
+        assert_eq!(
+            serde_json::to_string(&Urgency::Critical).unwrap(),
+            "\"Critical\""
+        );
+    }
+
+    #[test]
+    fn urgency_serde_roundtrip_low() {
+        let s = serde_json::to_string(&Urgency::Low).unwrap();
+        let back: Urgency = serde_json::from_str(&s).unwrap();
+        assert_eq!(back, Urgency::Low);
+    }
+
+    #[test]
+    fn urgency_serde_roundtrip_normal() {
+        let s = serde_json::to_string(&Urgency::Normal).unwrap();
+        let back: Urgency = serde_json::from_str(&s).unwrap();
+        assert_eq!(back, Urgency::Normal);
+    }
+
+    #[test]
+    fn urgency_serde_roundtrip_critical() {
+        let s = serde_json::to_string(&Urgency::Critical).unwrap();
+        let back: Urgency = serde_json::from_str(&s).unwrap();
+        assert_eq!(back, Urgency::Critical);
+    }
+
+    // ---- Notification serde ---------------------------------------------
+
+    fn full_notification() -> Notification {
+        Notification {
+            level: 42,
+            urgency: Urgency::Critical,
+            notified: false,
+            time_secs: Some(10),
+            command: Some("notify-send hi".to_string()),
+            title: Some("t".to_string()),
+            message: Some("{}%".to_string()),
+        }
+    }
+
+    #[test]
+    fn notification_roundtrip_full() {
+        let n = full_notification();
+        let s = serde_json::to_string(&n).unwrap();
+        let back: Notification = serde_json::from_str(&s).unwrap();
+        assert_eq!(back.level, 42);
+        assert_eq!(back.urgency, Urgency::Critical);
+        assert_eq!(back.time_secs, Some(10));
+        assert_eq!(back.command.as_deref(), Some("notify-send hi"));
+        assert_eq!(back.title.as_deref(), Some("t"));
+        assert_eq!(back.message.as_deref(), Some("{}%"));
+    }
+
+    #[test]
+    fn notification_roundtrip_minimal_applies_defaults() {
+        let json = r#"{"level":15,"urgency":"Normal"}"#;
+        let back: Notification = serde_json::from_str(json).unwrap();
+        assert_eq!(back.level, 15);
+        assert_eq!(back.urgency, Urgency::Normal);
+        assert!(!back.notified);
+        assert!(back.time_secs.is_none());
+        assert!(back.command.is_none());
+        assert!(back.title.is_none());
+        assert!(back.message.is_none());
+    }
+
+    #[test]
+    fn notification_skips_none_fields_on_serialize() {
+        let n = Notification {
+            level: 5,
+            urgency: Urgency::Low,
+            notified: false,
+            time_secs: None,
+            command: None,
+            title: None,
+            message: None,
+        };
+        let s = serde_json::to_string(&n).unwrap();
+        assert!(!s.contains("time_secs"), "got: {s}");
+        assert!(!s.contains("command"), "got: {s}");
+        assert!(!s.contains("title"), "got: {s}");
+        assert!(!s.contains("message"), "got: {s}");
+    }
+
+    #[test]
+    fn notification_notified_not_serialized() {
+        let mut n = full_notification();
+        n.notified = true;
+        let s = serde_json::to_string(&n).unwrap();
+        assert!(!s.contains("notified"), "got: {s}");
+        let back: Notification = serde_json::from_str(&s).unwrap();
+        assert!(!back.notified);
+    }
+
+    // ---- ChargingHook serde ---------------------------------------------
+
+    #[test]
+    fn charging_hook_roundtrip_full() {
+        let h = ChargingHook {
+            urgency: Urgency::Normal,
+            enabled: true,
+            time_secs: Some(5),
+            command: Some("xset dpms force on".to_string()),
+            title: Some("Charging".to_string()),
+            message: Some("Plugged in at {}%".to_string()),
+        };
+        let s = serde_json::to_string(&h).unwrap();
+        let back: ChargingHook = serde_json::from_str(&s).unwrap();
+        assert_eq!(back.urgency, Urgency::Normal);
+        assert!(back.enabled);
+        assert_eq!(back.time_secs, Some(5));
+        assert_eq!(back.command.as_deref(), Some("xset dpms force on"));
+        assert_eq!(back.title.as_deref(), Some("Charging"));
+        assert_eq!(back.message.as_deref(), Some("Plugged in at {}%"));
+    }
+
+    #[test]
+    fn charging_hook_roundtrip_minimal() {
+        let json = r#"{"urgency":"Low","enabled":false}"#;
+        let back: ChargingHook = serde_json::from_str(json).unwrap();
+        assert_eq!(back.urgency, Urgency::Low);
+        assert!(!back.enabled);
+        assert!(back.time_secs.is_none());
+        assert!(back.command.is_none());
+        assert!(back.title.is_none());
+        assert!(back.message.is_none());
+    }
+
+    #[test]
+    fn charging_hook_skips_none_command_on_serialize() {
+        let h = ChargingHook {
+            urgency: Urgency::Low,
+            enabled: false,
+            time_secs: None,
+            command: None,
+            title: None,
+            message: None,
+        };
+        let s = serde_json::to_string(&h).unwrap();
+        assert!(!s.contains("command"), "got: {s}");
+        assert!(!s.contains("title"), "got: {s}");
+        assert!(!s.contains("message"), "got: {s}");
+        assert!(!s.contains("time_secs"), "got: {s}");
+    }
+
+    // ---- BatteryFullNotification serde ----------------------------------
+
+    #[test]
+    fn battery_full_roundtrip_full() {
+        let b = BatteryFullNotification {
+            urgency: Urgency::Low,
+            notified: false,
+            time_secs: Some(10),
+            enabled: true,
+            command: Some("echo full".to_string()),
+            title: Some("Battery Status".to_string()),
+            message: Some("Fully Charged 100%".to_string()),
+        };
+        let s = serde_json::to_string(&b).unwrap();
+        let back: BatteryFullNotification = serde_json::from_str(&s).unwrap();
+        assert_eq!(back.urgency, Urgency::Low);
+        assert!(back.enabled);
+        assert_eq!(back.time_secs, Some(10));
+        assert_eq!(back.command.as_deref(), Some("echo full"));
+        assert_eq!(back.title.as_deref(), Some("Battery Status"));
+        assert_eq!(back.message.as_deref(), Some("Fully Charged 100%"));
+    }
+
+    #[test]
+    fn battery_full_roundtrip_minimal() {
+        let json = r#"{"urgency":"Critical","enabled":true}"#;
+        let back: BatteryFullNotification = serde_json::from_str(json).unwrap();
+        assert_eq!(back.urgency, Urgency::Critical);
+        assert!(back.enabled);
+        assert!(!back.notified);
+        assert!(back.time_secs.is_none());
+        assert!(back.command.is_none());
+        assert!(back.title.is_none());
+        assert!(back.message.is_none());
+    }
+
+    #[test]
+    fn battery_full_notified_not_serialized() {
+        let b = BatteryFullNotification {
+            urgency: Urgency::Low,
+            notified: true,
+            time_secs: None,
+            enabled: true,
+            command: None,
+            title: None,
+            message: None,
+        };
+        let s = serde_json::to_string(&b).unwrap();
+        assert!(!s.contains("notified"), "got: {s}");
+        let back: BatteryFullNotification = serde_json::from_str(&s).unwrap();
+        assert!(!back.notified);
+    }
+}
