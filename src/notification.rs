@@ -51,6 +51,30 @@ pub struct Notification {
     pub message: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ChargingHook {
+    pub urgency: Urgency,
+    // if disabled the hook does not fire
+    pub enabled: bool,
+
+    // optional notification display duration in seconds
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub time_secs: Option<u32>,
+
+    // optional script to run on plug/unplug event
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+
+    // optional notification title; '{}' is replaced with the current battery level.
+    // If both title and message are absent, no notification is shown (command-only hook).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+
+    // optional notification message; '{}' is replaced with the current battery level.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct BatteryFullNotification {
     pub urgency: Urgency,

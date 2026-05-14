@@ -3,16 +3,36 @@ use std::path::PathBuf;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
-use crate::notification::{BatteryFullNotification, Notification, Urgency};
+use crate::notification::{BatteryFullNotification, ChargingHook, Notification, Urgency};
 
 pub const CRITICAL_WAIT_TIME_SECS: u32 = 10000;
+pub const DEFAULT_POLL_INTERVAL_SECS: u32 = 60;
 
 const CONFIG_NAME: &str = "config.json";
+
+fn default_poll_interval_secs() -> u32 {
+    DEFAULT_POLL_INTERVAL_SECS
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     pub notifications: Vec<Notification>,
     pub full_notification: BatteryFullNotification,
+
+    // Optional hook fired when the AC adapter is plugged in
+    // (Discharging -> Charging or Discharging -> Full).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub charging_start: Option<ChargingHook>,
+
+    // Optional hook fired when the AC adapter is unplugged
+    // (Charging/Full -> Discharging).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub charging_stop: Option<ChargingHook>,
+
+    // How often the poll loop reads the battery (seconds). Also bounds how
+    // quickly plug/unplug hooks fire when UPower is unavailable.
+    #[serde(default = "default_poll_interval_secs")]
+    pub poll_interval_secs: u32,
 }
 
 #[derive(Debug)]
@@ -205,8 +225,29 @@ fn get_default_config() -> Config {
         message: Some("Fully Charged 100%".to_string()),
     };
 
+    let charging_start = ChargingHook {
+        urgency: Urgency::Low,
+        enabled: false,
+        time_secs: None,
+        command: None,
+        title: Some("Charging".to_string()),
+        message: Some("Plugged in at {}%".to_string()),
+    };
+
+    let charging_stop = ChargingHook {
+        urgency: Urgency::Low,
+        enabled: false,
+        time_secs: None,
+        command: None,
+        title: Some("Discharging".to_string()),
+        message: Some("Unplugged at {}%".to_string()),
+    };
+
     Config {
         notifications,
         full_notification,
+        charging_start: Some(charging_start),
+        charging_stop: Some(charging_stop),
+        poll_interval_secs: DEFAULT_POLL_INTERVAL_SECS,
     }
 }

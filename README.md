@@ -9,6 +9,8 @@ which the system will present to the user graphically usually in the form of a s
 Powernotd checks your battery-level and emits notifications in case they reach certain thresholds. It is only responsible for sending events
 and your system will need some kind of notification display daemon which displays and renders the notification on your system.
 
+In addition to sending notifications on power level thresholds or plugin/plugout events you can also run arbitrary shell commands for example to play a sound.
+
 If you use a desktop environment such a notification display daemon will be usually included. If not for example [mako](https://github.com/emersion/mako)
 or [dunst](https://github.com/dunst-project/dunst) are popular choices.
 
@@ -134,6 +136,43 @@ full_notification
   
 ```
 
+#### Charging hooks (plug/unplug events)
+
+Powernotd can run user-defined hooks when the AC adapter is plugged in or unplugged. Two optional top-level config sections,
+`charging_start` and `charging_stop`, mirror `full_notification` and accept both an optional notification and an optional shell command.
+
+```
+charging_start (optional)
+
+    urgency:    string, one of "Low", "Normal", "Critical"
+    enabled:    boolean, if false the hook does not fire
+    time_secs:  number, optional, notification display duration in seconds
+    command:    string, optional, shell command to run on plug-in. Useful for playing
+                a sound, e.g. "paplay /usr/share/sounds/freedesktop/stereo/power-plug.oga"
+    title:      string, optional, notification title. '{}' is replaced with the current battery level.
+                If both title and message are omitted, no notification is shown (command-only hook).
+    message:    string, optional, notification body. '{}' is replaced with the current battery level.
+
+charging_stop (optional)
+
+    Same fields as charging_start; fires when the AC adapter is unplugged.
+```
+
+`charging_start` fires on `Discharging → Charging` or `Discharging → Full` (i.e. plug-in, even if the battery is already at 100%).
+`charging_stop` fires on `Charging → Discharging` or `Full → Discharging` (i.e. unplug). Transitions between `Charging` and `Full` are
+treated as "still plugged in" and do not fire. Hooks never fire on daemon startup; they only fire on real transitions while running.
+
+##### Detection: event-driven with poll fallback
+
+When available, powernotd subscribes to UPower's D-Bus `PropertiesChanged` signal so plug/unplug hooks fire within milliseconds.
+If UPower or the system D-Bus is unavailable, the daemon falls back to detecting transitions in its existing poll loop, in which case
+hooks fire within `poll_interval_secs` of the event. The poll interval is configurable via the top-level `poll_interval_secs` field
+(default `60`):
+
+```json
+"poll_interval_secs": 60
+```
+
 
 Full default configuration file:
 ```json
@@ -192,7 +231,20 @@ Full default configuration file:
     "enabled": true,
     "title": "Battery Status",
     "message": "Fully Charged 100%"
-  }
+  },
+  "charging_start": {
+    "urgency": "Low",
+    "enabled": false,
+    "title": "Charging",
+    "message": "Plugged in at {}%"
+  },
+  "charging_stop": {
+    "urgency": "Low",
+    "enabled": false,
+    "title": "Discharging",
+    "message": "Unplugged at {}%"
+  },
+  "poll_interval_secs": 60
 }
 ```
 

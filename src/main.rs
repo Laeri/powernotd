@@ -6,9 +6,37 @@ use powernotd::config;
 use powernotd::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::{thread, time};
 
-use powernotd::notification::Notification;
+use powernotd::notification::{ChargingHook, Notification};
+
+fn plugin_plugout_check_fallback(
+    battery: Option<&Battery>,
+    level: u32,
+    last_charging_status: &mut Option<ChargingStatus>,
+    charging_start: &Option<Arc<ChargingHook>>,
+    charging_stop: &Option<Arc<ChargingHook>>,
+) {
+    let current = get_charging_status(battery);
+    if matches!(current, ChargingStatus::Unknown) {
+        return;
+    }
+    if let Some(prev) = last_charging_status {
+        let was_plugged = prev.is_plugged_in();
+        let is_plugged = current.is_plugged_in();
+        if !was_plugged && is_plugged {
+            if let Some(hook) = charging_start {
+                fire_plugin_plugout_hook(level, hook);
+            }
+        } else if was_plugged && !is_plugged {
+            if let Some(hook) = charging_stop {
+                fire_plugin_plugout_hook(level, hook);
+            }
+        }
+    }
+    *last_charging_status = Some(current);
+}
 
 fn main() {
     let args = Args::parse();
@@ -37,7 +65,7 @@ fn main() {
     }
 
     if args.charging_state {
-        let status = get_status_charging(battery);
+        let status = get_charging_status_text(battery);
         println!("{}", status);
         return;
     }
@@ -79,8 +107,30 @@ fn main() {
         return;
     }
 
-    let sleep_time = time::Duration::from_secs(60);
+    let sleep_time = time::Duration::from_secs(config.poll_interval_secs.max(1) as u64);
     let mut last_battery_level: u32 = 100;
+    let mut last_charging_status: Option<ChargingStatus> = None;
+
+    let charging_start_arc = config.charging_start.take().map(Arc::new);
+    let charging_stop_arc = config.charging_stop.take().map(Arc::new);
+
+    // Prefer event-driven plug/unplug detection via UPower. If unavailable
+    // (no D-Bus, UPower not running, or device path not found), fall back to
+    // detecting transitions in the poll loop.
+    let upower_active = match upower::try_spawn_listener(
+        args.battery.clone(),
+        charging_start_arc.clone(),
+        charging_stop_arc.clone(),
+    ) {
+        Ok(()) => true,
+        Err(err) => {
+            eprintln!(
+                "UPower unavailable ({}), using poll-based plug/unplug detection",
+                err
+            );
+            false
+        }
+    };
 
     let mut notified: HashMap<u32, Notification> = HashMap::new();
 
@@ -104,6 +154,16 @@ fn main() {
         check_notify_full_battery(&level, &last_battery_level, &mut config.full_notification);
 
         last_battery_level = level;
+
+        if !upower_active {
+            plugin_plugout_check_fallback(
+                battery,
+                level,
+                &mut last_charging_status,
+                &charging_start_arc,
+                &charging_stop_arc,
+            );
+        }
 
         thread::sleep(sleep_time);
     }
