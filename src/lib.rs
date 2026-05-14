@@ -70,7 +70,7 @@ pub fn get_charging_status(battery: Option<&Battery>) -> ChargingStatus {
     }
 }
 
-pub fn get_status_charging(battery: Option<&Battery>) -> String {
+pub fn get_charging_status_text(battery: Option<&Battery>) -> String {
     get_charging_status(battery).as_string()
 }
 
@@ -141,9 +141,8 @@ pub fn send_notification(level: &u32, notification: &notification::Notification)
     }
 }
 
-/// Fire a charging hook: optionally show a notification (if title or message is set) and
-/// optionally run a command. The current battery `level` is templated into '{}'.
-pub fn fire_charging_hook(level: u32, hook: &ChargingHook) {
+// hook to fire notification / run command on plugin/plugout
+pub fn fire_plugin_plugout_hook(level: u32, hook: &ChargingHook) {
     if !hook.enabled {
         return;
     }

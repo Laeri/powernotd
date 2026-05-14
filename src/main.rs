@@ -9,7 +9,34 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::{thread, time};
 
-use powernotd::notification::Notification;
+use powernotd::notification::{ChargingHook, Notification};
+
+fn plugin_plugout_check_fallback(
+    battery: Option<&Battery>,
+    level: u32,
+    last_charging_status: &mut Option<ChargingStatus>,
+    charging_start: &Option<Arc<ChargingHook>>,
+    charging_stop: &Option<Arc<ChargingHook>>,
+) {
+    let current = get_charging_status(battery);
+    if matches!(current, ChargingStatus::Unknown) {
+        return;
+    }
+    if let Some(prev) = last_charging_status {
+        let was_plugged = prev.is_plugged_in();
+        let is_plugged = current.is_plugged_in();
+        if !was_plugged && is_plugged {
+            if let Some(hook) = charging_start {
+                fire_plugin_plugout_hook(level, hook);
+            }
+        } else if was_plugged && !is_plugged {
+            if let Some(hook) = charging_stop {
+                fire_plugin_plugout_hook(level, hook);
+            }
+        }
+    }
+    *last_charging_status = Some(current);
+}
 
 fn main() {
     let args = Args::parse();
@@ -38,7 +65,7 @@ fn main() {
     }
 
     if args.charging_state {
-        let status = get_status_charging(battery);
+        let status = get_charging_status_text(battery);
         println!("{}", status);
         return;
     }
@@ -129,23 +156,13 @@ fn main() {
         last_battery_level = level;
 
         if !upower_active {
-            let current = get_charging_status(battery);
-            if !matches!(current, ChargingStatus::Unknown) {
-                if let Some(prev) = last_charging_status {
-                    let was_plugged = prev.is_plugged_in();
-                    let is_plugged = current.is_plugged_in();
-                    if !was_plugged && is_plugged {
-                        if let Some(hook) = &charging_start_arc {
-                            fire_charging_hook(level, hook);
-                        }
-                    } else if was_plugged && !is_plugged {
-                        if let Some(hook) = &charging_stop_arc {
-                            fire_charging_hook(level, hook);
-                        }
-                    }
-                }
-                last_charging_status = Some(current);
-            }
+            plugin_plugout_check_fallback(
+                battery,
+                level,
+                &mut last_charging_status,
+                &charging_start_arc,
+                &charging_stop_arc,
+            );
         }
 
         thread::sleep(sleep_time);

@@ -9,8 +9,7 @@ which the system will present to the user graphically usually in the form of a s
 Powernotd checks your battery-level and emits notifications in case they reach certain thresholds. It is only responsible for sending events
 and your system will need some kind of notification display daemon which displays and renders the notification on your system.
 
-In addition to level thresholds, powernotd can fire user-defined hooks (a notification, a shell command, or both) when the AC adapter is
-plugged in or unplugged. See `charging_start` and `charging_stop` in [Configuration file](#configuration-file).
+In addition to sending notifications on power level thresholds or plugin/plugout events you can also run arbitrary shell commands for example to play a sound.
 
 If you use a desktop environment such a notification display daemon will be usually included. If not for example [mako](https://github.com/emersion/mako)
 or [dunst](https://github.com/dunst-project/dunst) are popular choices.
