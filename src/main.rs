@@ -43,6 +43,8 @@ fn plugin_plugout_check_fallback(
 fn main() {
     let args = Args::parse();
 
+    set_mute_notification_warning(args.mute_notification_warning);
+
     let battery: Option<&Battery> = args.battery.as_deref();
 
     // these paths are required for reading power supply status; skip the
