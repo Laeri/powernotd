@@ -12,13 +12,20 @@ pub type Battery = str;
 pub const DEFAULT_BATTERY: &Battery = "BAT0";
 
 pub fn get_charging_status_path(battery: Option<&Battery>) -> String {
-    let battery = battery.as_deref().unwrap_or(DEFAULT_BATTERY);
+    let battery = battery.unwrap_or(DEFAULT_BATTERY);
     format!("/sys/class/power_supply/{}/status", battery)
 }
 
 pub fn get_power_status_path(battery: Option<&Battery>) -> String {
-    let battery = battery.as_deref().unwrap_or(DEFAULT_BATTERY);
+    let battery = battery.unwrap_or(DEFAULT_BATTERY);
     format!("/sys/class/power_supply/{}/capacity", battery)
+}
+
+/// Pure parser: maps the contents of `/sys/class/power_supply/*/capacity`
+/// to a battery percentage. Trims whitespace and panics on malformed input
+/// to preserve the original sysfs-read behaviour.
+pub fn parse_power_level(s: &str) -> u32 {
+    s.trim().parse().expect("failed to parse number")
 }
 
 /// Return the current battery level
@@ -27,7 +34,7 @@ pub fn get_current_power(battery: Option<&Battery>) -> u32 {
     let mut file = File::open(power_status_path).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
-    contents.trim().parse().expect("failed to parse number")
+    parse_power_level(&contents)
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -57,17 +64,25 @@ impl ChargingStatus {
     }
 }
 
-pub fn get_charging_status(battery: Option<&Battery>) -> ChargingStatus {
-    let status_charging_path = get_charging_status_path(battery);
-    let mut file = File::open(status_charging_path).unwrap();
-    let mut contents = String::new();
-    file.read_to_string(&mut contents).unwrap();
-    match contents.trim() {
+/// Pure parser: maps the contents of `/sys/class/power_supply/*/status`
+/// to a [`ChargingStatus`]. Trims whitespace. "Not charging" is treated
+/// as Full because kernels report it once the battery hits a charge-stop
+/// threshold.
+pub fn parse_charging_status(s: &str) -> ChargingStatus {
+    match s.trim() {
         "Charging" => ChargingStatus::Charging,
         "Discharging" => ChargingStatus::Discharging,
         "Full" | "Not charging" => ChargingStatus::Full,
         _ => ChargingStatus::Unknown,
     }
+}
+
+pub fn get_charging_status(battery: Option<&Battery>) -> ChargingStatus {
+    let status_charging_path = get_charging_status_path(battery);
+    let mut file = File::open(status_charging_path).unwrap();
+    let mut contents = String::new();
+    file.read_to_string(&mut contents).unwrap();
+    parse_charging_status(&contents)
 }
 
 pub fn get_charging_status_text(battery: Option<&Battery>) -> String {

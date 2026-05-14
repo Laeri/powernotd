@@ -25,14 +25,16 @@ fn plugin_plugout_check_fallback(
     if let Some(prev) = last_charging_status {
         let was_plugged = prev.is_plugged_in();
         let is_plugged = current.is_plugged_in();
-        if !was_plugged && is_plugged {
-            if let Some(hook) = charging_start {
-                fire_plugin_plugout_hook(level, hook);
-            }
-        } else if was_plugged && !is_plugged {
-            if let Some(hook) = charging_stop {
-                fire_plugin_plugout_hook(level, hook);
-            }
+        if !was_plugged
+            && is_plugged
+            && let Some(hook) = charging_start
+        {
+            fire_plugin_plugout_hook(level, hook);
+        } else if was_plugged
+            && !is_plugged
+            && let Some(hook) = charging_stop
+        {
+            fire_plugin_plugout_hook(level, hook);
         }
     }
     *last_charging_status = Some(current);
@@ -142,11 +144,12 @@ fn main() {
         let level = get_current_power(battery);
         let current_threshold = find_lowest_threshold(level, &notified);
         if let Some(threshold_val) = current_threshold {
-            if let Some(notification) = notified.get_mut(&threshold_val) {
-                if !notification.notified && level < last_battery_level {
-                    send_notification(&level, notification);
-                    notification.notified = true;
-                }
+            if let Some(notification) = notified.get_mut(&threshold_val)
+                && !notification.notified
+                && level < last_battery_level
+            {
+                send_notification(&level, notification);
+                notification.notified = true;
             }
             reset_other_notifications(&threshold_val, &mut notified);
         }

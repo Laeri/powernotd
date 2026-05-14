@@ -1,8 +1,8 @@
 use crate::notification::ChargingHook;
-use crate::{fire_plugin_plugout_hook, get_current_power, ChargingStatus, DEFAULT_BATTERY};
+use crate::{ChargingStatus, DEFAULT_BATTERY, fire_plugin_plugout_hook, get_current_power};
 use std::sync::Arc;
 use std::thread;
-use zbus::blocking::{fdo::PropertiesProxy, Connection};
+use zbus::blocking::{Connection, fdo::PropertiesProxy};
 use zbus::names::InterfaceName;
 use zbus::zvariant::ObjectPath;
 
@@ -121,16 +121,18 @@ pub fn try_spawn_listener(
             let is_plugged = current.is_plugged_in();
             let bat = bat_owned.as_deref();
 
-            if !was_plugged && is_plugged {
-                if let Some(hook) = &charging_start {
-                    let level = get_current_power(bat);
-                    fire_plugin_plugout_hook(level, hook);
-                }
-            } else if was_plugged && !is_plugged {
-                if let Some(hook) = &charging_stop {
-                    let level = get_current_power(bat);
-                    fire_plugin_plugout_hook(level, hook);
-                }
+            if !was_plugged
+                && is_plugged
+                && let Some(hook) = &charging_start
+            {
+                let level = get_current_power(bat);
+                fire_plugin_plugout_hook(level, hook);
+            } else if was_plugged
+                && !is_plugged
+                && let Some(hook) = &charging_stop
+            {
+                let level = get_current_power(bat);
+                fire_plugin_plugout_hook(level, hook);
             }
 
             last_status = current;
