@@ -45,18 +45,21 @@ fn main() {
 
     let battery: Option<&Battery> = args.battery.as_deref();
 
-    // these paths are required for reading power supply status
-    let required_paths = vec![
-        PathBuf::from(get_power_status_path(battery)),
-        PathBuf::from(get_charging_status_path(battery)),
-    ];
-    for path in required_paths {
-        if !path.exists() {
-            eprintln!(
-                "Require file at path: {} order to read power status! If you have a different battery such as BAT1 pass it using the -b flag.",
-                path.to_string_lossy()
-            );
-            std::process::exit(1);
+    // these paths are required for reading power supply status; skip the
+    // check for flags that don't touch battery state.
+    if !args.list_thresholds && !args.show_config_path {
+        let required_paths = vec![
+            PathBuf::from(get_power_status_path(battery)),
+            PathBuf::from(get_charging_status_path(battery)),
+        ];
+        for path in required_paths {
+            if !path.exists() {
+                eprintln!(
+                    "Require file at path: {} order to read power status! If you have a different battery such as BAT1 pass it using the -b flag.",
+                    path.to_string_lossy()
+                );
+                std::process::exit(1);
+            }
         }
     }
 
