@@ -151,8 +151,8 @@ pub fn send_notification(level: &u32, notification: &notification::Notification)
         &notification.urgency,
         notification.time_secs,
     );
-    if notification.command.is_some() {
-        run_command(notification.command.as_ref().unwrap());
+    if let Some(cmd) = &notification.command {
+        run_command(cmd);
     }
 }
 
@@ -241,8 +241,8 @@ pub fn check_notify_full_battery(
         .unwrap_or("Fully Charged 100%".to_string());
     if *current >= 100 {
         send_message(&title, &message, &full_notification.urgency, None);
-        if full_notification.command.is_some() {
-            run_command(full_notification.command.as_ref().unwrap());
+        if let Some(cmd) = &full_notification.command {
+            run_command(cmd);
         }
         full_notification.notified = true;
     }
