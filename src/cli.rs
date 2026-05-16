@@ -30,6 +30,10 @@ pub struct Args {
     #[arg(short = 'p', long, default_value_t = false)]
     pub show_config_path: bool,
 
+    /// Print the default configuration as JSON then exit
+    #[arg(long, default_value_t = false)]
+    pub emit_default_config: bool,
+
     /// Pass the battery such as 'BAT1' if your system has multiple and you do not want to use the
     /// default (BAT0). Check '/sys/class/power_supply/' to see which batteries you have.
     #[arg(short = 'b', long)]
@@ -66,6 +70,7 @@ mod tests {
         assert!(!a.notify_now);
         assert!(!a.list_thresholds);
         assert!(!a.show_config_path);
+        assert!(!a.emit_default_config);
         assert!(a.config_file.is_none());
         assert!(a.battery.is_none());
     }
@@ -104,6 +109,12 @@ mod tests {
     fn cli_parse_show_config_path_short() {
         let a = Args::try_parse_from(["powernotd", "-p"]).expect("parse");
         assert!(a.show_config_path);
+    }
+
+    #[test]
+    fn cli_parse_emit_default_config_long() {
+        let a = Args::try_parse_from(["powernotd", "--emit-default-config"]).expect("parse");
+        assert!(a.emit_default_config);
     }
 
     #[test]

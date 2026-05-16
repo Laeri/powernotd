@@ -1,6 +1,10 @@
 use notify_rust::Urgency as SendUrgency;
 use serde::{Deserialize, Serialize};
 
+fn default_show_threshold_warning() -> bool {
+    true
+}
+
 #[derive(Eq, PartialEq, Hash, Copy, Clone, Debug, Deserialize, Serialize)]
 pub enum Urgency {
     /// The behaviour for `Low` urgency depends on the notification server.
@@ -52,7 +56,7 @@ pub struct Notification {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ChargingHook {
+pub struct ChargingHookBase {
     pub urgency: Urgency,
     // if disabled the hook does not fire
     pub enabled: bool,
@@ -73,6 +77,26 @@ pub struct ChargingHook {
     // optional notification message; '{}' is replaced with the current battery level.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ChargingStartHook {
+    #[serde(flatten)]
+    pub base: ChargingHookBase,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ChargingStopHook {
+    #[serde(flatten)]
+    pub base: ChargingHookBase,
+
+    // Show the matching threshold warning on unplug if the current battery
+    // level is already below a configured threshold.
+    #[serde(
+        default = "default_show_threshold_warning",
+        alias = "show_threshold_warning"
+    )]
+    pub show_threshold_warning_on_unplug: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -238,55 +262,149 @@ mod tests {
         assert!(!back.notified);
     }
 
-    // ---- ChargingHook serde ---------------------------------------------
+    // ---- ChargingStartHook serde ----------------------------------------
 
     #[test]
-    fn charging_hook_roundtrip_full() {
-        let h = ChargingHook {
-            urgency: Urgency::Normal,
-            enabled: true,
-            time_secs: Some(5),
-            command: Some("xset dpms force on".to_string()),
-            title: Some("Charging".to_string()),
-            message: Some("Plugged in at {}%".to_string()),
+    fn charging_start_hook_roundtrip_full() {
+        let h = ChargingStartHook {
+            base: ChargingHookBase {
+                urgency: Urgency::Normal,
+                enabled: true,
+                time_secs: Some(5),
+                command: Some("xset dpms force on".to_string()),
+                title: Some("Charging".to_string()),
+                message: Some("Plugged in at {}%".to_string()),
+            },
         };
         let s = serde_json::to_string(&h).unwrap();
-        let back: ChargingHook = serde_json::from_str(&s).unwrap();
-        assert_eq!(back.urgency, Urgency::Normal);
-        assert!(back.enabled);
-        assert_eq!(back.time_secs, Some(5));
-        assert_eq!(back.command.as_deref(), Some("xset dpms force on"));
-        assert_eq!(back.title.as_deref(), Some("Charging"));
-        assert_eq!(back.message.as_deref(), Some("Plugged in at {}%"));
+        let back: ChargingStartHook = serde_json::from_str(&s).unwrap();
+        assert_eq!(back.base.urgency, Urgency::Normal);
+        assert!(back.base.enabled);
+        assert_eq!(back.base.time_secs, Some(5));
+        assert_eq!(back.base.command.as_deref(), Some("xset dpms force on"));
+        assert_eq!(back.base.title.as_deref(), Some("Charging"));
+        assert_eq!(back.base.message.as_deref(), Some("Plugged in at {}%"));
     }
 
     #[test]
-    fn charging_hook_roundtrip_minimal() {
+    fn charging_start_hook_roundtrip_minimal() {
         let json = r#"{"urgency":"Low","enabled":false}"#;
-        let back: ChargingHook = serde_json::from_str(json).unwrap();
-        assert_eq!(back.urgency, Urgency::Low);
-        assert!(!back.enabled);
-        assert!(back.time_secs.is_none());
-        assert!(back.command.is_none());
-        assert!(back.title.is_none());
-        assert!(back.message.is_none());
+        let back: ChargingStartHook = serde_json::from_str(json).unwrap();
+        assert_eq!(back.base.urgency, Urgency::Low);
+        assert!(!back.base.enabled);
+        assert!(back.base.time_secs.is_none());
+        assert!(back.base.command.is_none());
+        assert!(back.base.title.is_none());
+        assert!(back.base.message.is_none());
     }
 
     #[test]
-    fn charging_hook_skips_none_command_on_serialize() {
-        let h = ChargingHook {
-            urgency: Urgency::Low,
-            enabled: false,
-            time_secs: None,
-            command: None,
-            title: None,
-            message: None,
+    fn charging_start_hook_does_not_serialize_show_threshold_warning() {
+        let h = ChargingStartHook {
+            base: ChargingHookBase {
+                urgency: Urgency::Low,
+                enabled: false,
+                time_secs: None,
+                command: None,
+                title: None,
+                message: None,
+            },
+        };
+        let s = serde_json::to_string(&h).unwrap();
+        assert!(!s.contains("show_threshold_warning"), "got: {s}");
+    }
+
+    #[test]
+    fn charging_start_hook_skips_none_fields_on_serialize() {
+        let h = ChargingStartHook {
+            base: ChargingHookBase {
+                urgency: Urgency::Low,
+                enabled: false,
+                time_secs: None,
+                command: None,
+                title: None,
+                message: None,
+            },
         };
         let s = serde_json::to_string(&h).unwrap();
         assert!(!s.contains("command"), "got: {s}");
         assert!(!s.contains("title"), "got: {s}");
         assert!(!s.contains("message"), "got: {s}");
         assert!(!s.contains("time_secs"), "got: {s}");
+    }
+
+    // ---- ChargingStopHook serde -----------------------------------------
+
+    #[test]
+    fn charging_stop_hook_roundtrip_full() {
+        let h = ChargingStopHook {
+            base: ChargingHookBase {
+                urgency: Urgency::Normal,
+                enabled: true,
+                time_secs: Some(5),
+                command: Some("xset dpms force off".to_string()),
+                title: Some("Discharging".to_string()),
+                message: Some("Unplugged at {}%".to_string()),
+            },
+            show_threshold_warning_on_unplug: true,
+        };
+        let s = serde_json::to_string(&h).unwrap();
+        let back: ChargingStopHook = serde_json::from_str(&s).unwrap();
+        assert_eq!(back.base.urgency, Urgency::Normal);
+        assert!(back.base.enabled);
+        assert!(back.show_threshold_warning_on_unplug);
+    }
+
+    #[test]
+    fn charging_stop_hook_show_threshold_warning_on_unplug_false_survives_roundtrip() {
+        let h = ChargingStopHook {
+            base: ChargingHookBase {
+                urgency: Urgency::Low,
+                enabled: false,
+                time_secs: None,
+                command: None,
+                title: None,
+                message: None,
+            },
+            show_threshold_warning_on_unplug: false,
+        };
+        let s = serde_json::to_string(&h).unwrap();
+        let back: ChargingStopHook = serde_json::from_str(&s).unwrap();
+        assert!(!back.show_threshold_warning_on_unplug);
+    }
+
+    #[test]
+    fn charging_stop_hook_show_threshold_warning_on_unplug_always_serialized() {
+        let h = ChargingStopHook {
+            base: ChargingHookBase {
+                urgency: Urgency::Low,
+                enabled: false,
+                time_secs: None,
+                command: None,
+                title: None,
+                message: None,
+            },
+            show_threshold_warning_on_unplug: false,
+        };
+        let s = serde_json::to_string(&h).unwrap();
+        assert!(
+            s.contains("\"show_threshold_warning_on_unplug\":false"),
+            "got: {s}"
+        );
+    }
+
+    #[test]
+    fn charging_stop_hook_minimal_json_defaults_show_threshold_warning_on_unplug_to_true() {
+        let json = r#"{"urgency":"Low","enabled":false}"#;
+        let back: ChargingStopHook = serde_json::from_str(json).unwrap();
+        assert!(back.show_threshold_warning_on_unplug);
+    }
+
+    #[test]
+    fn charging_stop_hook_old_show_threshold_warning_key_still_parses() {
+        let json = r#"{"urgency":"Low","enabled":false,"show_threshold_warning":false}"#;
+        let back: ChargingStopHook = serde_json::from_str(json).unwrap();
+        assert!(!back.show_threshold_warning_on_unplug);
     }
 
     // ---- BatteryFullNotification serde ----------------------------------

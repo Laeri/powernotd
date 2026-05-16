@@ -29,6 +29,7 @@ _powernotd() {
 '--list-thresholds[List all notification thresholds in the format '\''a_1%, a_2%, ..., a_n%'\'' that are specified in the config-file]' \
 '-p[Display the path to the config-file]' \
 '--show-config-path[Display the path to the config-file]' \
+'--emit-default-config[Print the default configuration as JSON then exit]' \
 '--mute-notification-warning[Suppress the stderr warning printed when no desktop notification daemon (dunst, mako, notification-daemon, xfce4-notifyd, ...) is reachable on D-Bus. Notifications still attempt to fire; this only silences the diagnostic]' \
 '-h[Print help]' \
 '--help[Print help]' \

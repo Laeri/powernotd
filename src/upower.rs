@@ -1,4 +1,4 @@
-use crate::notification::ChargingHook;
+use crate::notification::{ChargingStartHook, ChargingStopHook};
 use crate::{ChargingStatus, DEFAULT_BATTERY, fire_plugin_plugout_hook, get_current_power};
 use std::sync::Arc;
 use std::thread;
@@ -54,8 +54,8 @@ fn iface_name() -> InterfaceName<'static> {
 // -> on error we have a fallback at the caller
 pub fn try_spawn_listener(
     battery: Option<String>,
-    charging_start: Option<Arc<ChargingHook>>,
-    charging_stop: Option<Arc<ChargingHook>>,
+    charging_start: Option<Arc<ChargingStartHook>>,
+    charging_stop: Option<Arc<ChargingStopHook>>,
 ) -> zbus::Result<()> {
     let conn = Connection::system()?;
 
@@ -127,13 +127,13 @@ pub fn try_spawn_listener(
                 && let Some(hook) = &charging_start
             {
                 let level = get_current_power(bat);
-                fire_plugin_plugout_hook(level, hook);
+                fire_plugin_plugout_hook(level, &hook.base);
             } else if was_plugged
                 && !is_plugged
                 && let Some(hook) = &charging_stop
             {
                 let level = get_current_power(bat);
-                fire_plugin_plugout_hook(level, hook);
+                fire_plugin_plugout_hook(level, &hook.base);
             }
 
             last_status = current;

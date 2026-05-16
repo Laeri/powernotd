@@ -3,7 +3,10 @@ use std::path::PathBuf;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
-use crate::notification::{BatteryFullNotification, ChargingHook, Notification, Urgency};
+use crate::notification::{
+    BatteryFullNotification, ChargingHookBase, ChargingStartHook, ChargingStopHook, Notification,
+    Urgency,
+};
 
 pub const CRITICAL_WAIT_TIME_SECS: u32 = 10000;
 pub const DEFAULT_POLL_INTERVAL_SECS: u32 = 60;
@@ -14,20 +17,39 @@ fn default_poll_interval_secs() -> u32 {
     DEFAULT_POLL_INTERVAL_SECS
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(default)]
+pub struct PluggedInStartupNotification {
+    pub show_full: bool,
+    pub show_threshold: bool,
+}
+
+impl Default for PluggedInStartupNotification {
+    fn default() -> Self {
+        Self {
+            show_full: true,
+            show_threshold: false,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     pub notifications: Vec<Notification>,
     pub full_notification: BatteryFullNotification,
 
+    #[serde(default)]
+    pub plugged_in_startup_notification: PluggedInStartupNotification,
+
     // Optional hook fired when the AC adapter is plugged in
     // (Discharging -> Charging or Discharging -> Full).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub charging_start: Option<ChargingHook>,
+    pub charging_start: Option<ChargingStartHook>,
 
     // Optional hook fired when the AC adapter is unplugged
     // (Charging/Full -> Discharging).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub charging_stop: Option<ChargingHook>,
+    pub charging_stop: Option<ChargingStopHook>,
 
     // How often the poll loop reads the battery (seconds). Also bounds how
     // quickly plug/unplug hooks fire when UPower is unavailable.
@@ -225,27 +247,33 @@ pub fn get_default_config() -> Config {
         message: Some("Fully Charged 100%".to_string()),
     };
 
-    let charging_start = ChargingHook {
-        urgency: Urgency::Low,
-        enabled: false,
-        time_secs: None,
-        command: None,
-        title: Some("Charging".to_string()),
-        message: Some("Plugged in at {}%".to_string()),
+    let charging_start = ChargingStartHook {
+        base: ChargingHookBase {
+            urgency: Urgency::Low,
+            enabled: false,
+            time_secs: None,
+            command: None,
+            title: Some("Charging".to_string()),
+            message: Some("Plugged in at {}%".to_string()),
+        },
     };
 
-    let charging_stop = ChargingHook {
-        urgency: Urgency::Low,
-        enabled: false,
-        time_secs: None,
-        command: None,
-        title: Some("Discharging".to_string()),
-        message: Some("Unplugged at {}%".to_string()),
+    let charging_stop = ChargingStopHook {
+        base: ChargingHookBase {
+            urgency: Urgency::Low,
+            enabled: false,
+            time_secs: None,
+            command: None,
+            title: Some("Discharging".to_string()),
+            message: Some("Unplugged at {}%".to_string()),
+        },
+        show_threshold_warning_on_unplug: true,
     };
 
     Config {
         notifications,
         full_notification,
+        plugged_in_startup_notification: PluggedInStartupNotification::default(),
         charging_start: Some(charging_start),
         charging_stop: Some(charging_stop),
         poll_interval_secs: DEFAULT_POLL_INTERVAL_SECS,
@@ -296,6 +324,21 @@ mod tests {
         assert_eq!(cfg.poll_interval_secs, DEFAULT_POLL_INTERVAL_SECS);
         assert!(cfg.charging_start.is_none());
         assert!(cfg.charging_stop.is_none());
+        assert!(cfg.plugged_in_startup_notification.show_full);
+        assert!(!cfg.plugged_in_startup_notification.show_threshold);
+    }
+
+    #[test]
+    fn load_config_from_file_partial_plugged_in_startup_applies_defaults() {
+        let json = r#"{
+          "notifications": [],
+          "full_notification": {"urgency": "Low", "enabled": false},
+          "plugged_in_startup_notification": {"show_threshold": true}
+        }"#;
+        let f = write_tmp(json);
+        let cfg = load_config_from_file(&f.path().to_path_buf()).expect("load ok");
+        assert!(cfg.plugged_in_startup_notification.show_full);
+        assert!(cfg.plugged_in_startup_notification.show_threshold);
     }
 
     #[test]
@@ -370,14 +413,31 @@ mod tests {
         let cfg = get_default_config();
         let start = cfg.charging_start.expect("charging_start present");
         let stop = cfg.charging_stop.expect("charging_stop present");
-        assert!(!start.enabled);
-        assert!(!stop.enabled);
+        assert!(!start.base.enabled);
+        assert!(!stop.base.enabled);
+        assert!(stop.show_threshold_warning_on_unplug);
     }
 
     #[test]
     fn get_default_config_poll_interval_is_60() {
         let cfg = get_default_config();
         assert_eq!(cfg.poll_interval_secs, 60);
+    }
+
+    #[test]
+    fn get_default_config_plugged_in_startup_notification_defaults() {
+        let cfg = get_default_config();
+        assert!(cfg.plugged_in_startup_notification.show_full);
+        assert!(!cfg.plugged_in_startup_notification.show_threshold);
+    }
+
+    #[test]
+    fn get_default_config_serde_roundtrip_preserves_show_threshold_warning_on_unplug() {
+        let cfg = get_default_config();
+        let s = serde_json::to_string(&cfg).expect("serialize default config");
+        let back: Config = serde_json::from_str(&s).expect("deserialize default config");
+        let stop = back.charging_stop.expect("charging_stop present");
+        assert!(stop.show_threshold_warning_on_unplug);
     }
 
     #[test]

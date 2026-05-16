@@ -83,6 +83,7 @@ Options:
   -n, --notify-now                 Send desktop notification with current battery-level then exit
   -t, --list-thresholds            List all notification thresholds in the format 'a_1%, a_2%, ..., a_n%' that are specified in the config-file
   -p, --show-config-path           Display the path to the config-file
+      --emit-default-config        Print the default configuration as JSON then exit
   -b, --battery <BATTERY>          Pass the battery such as 'BAT1' if your system has multiple and you do not want to use the default (BAT0). Check '/sys/class/power_supply/' to see which batteries you have
   -h, --help                       Print help
   -V, --version                    Print version
@@ -95,6 +96,7 @@ This means that if you have an environment variable named `XDG_CONFIG_HOME` spec
 `XDG_CONFIG_HOME/powernotd/config.json`. If this environment variable is not present the configuration file will be created in the path:
 `~/.config/powernotd/config.json`.
 If you want to run powernotd with a custom configuration file use the `-f` or `--config-file` flag and provide your own path.
+Run `powernotd --emit-default-config` to print the default configuration to stdout.
 
 The configuration file is Json and the following is the annotated default configuration.
 Each entry in the `notifications` array contains a threshold for which a notification should be sent if the current power level drops
@@ -136,6 +138,26 @@ full_notification
   
 ```
 
+#### Plugged-in startup notifications
+
+The `plugged_in_startup_notification` configuration is a small UX improvement for daemon startup while the machine is already
+plugged in. By default, powernotd does not show threshold notifications in that state because no action is needed when the
+machine is already charging. It still shows the full battery notification by default, because you might want to unplug the
+machine once the battery is full.
+
+Both startup behaviors can be configured:
+
+```json
+"plugged_in_startup_notification": {
+  "show_full": true,
+  "show_threshold": false
+}
+```
+
+`show_full` controls whether the full battery notification is shown when powernotd starts while already plugged in and full.
+`show_threshold` controls whether threshold notifications are shown when powernotd starts while already plugged in and below a
+configured threshold. This only affects startup; threshold and full notifications still fire normally while powernotd is running.
+
 #### Charging hooks (plug/unplug events)
 
 Powernotd can run user-defined hooks when the AC adapter is plugged in or unplugged. Two optional top-level config sections,
@@ -156,6 +178,12 @@ charging_start (optional)
 charging_stop (optional)
 
     Same fields as charging_start; fires when the AC adapter is unplugged.
+    show_threshold_warning: boolean, if true powernotd emits the matching threshold warning when unplugged while already
+                            below a configured threshold. This is enabled by default in the default config so a startup
+                            threshold warning can be suppressed while plugged in, but still shown if you later unplug before
+                            the battery has charged above the threshold. This setting is independent from enabled.
+                            Note: this field is ignored if set on charging_start — by the time plug-in fires, any matching
+                            threshold notification has already been handled during the preceding discharge.
 ```
 
 `charging_start` fires on `Discharging → Charging` or `Discharging → Full` (i.e. plug-in, even if the battery is already at 100%).
@@ -232,6 +260,10 @@ Full default configuration file:
     "title": "Battery Status",
     "message": "Fully Charged 100%"
   },
+  "plugged_in_startup_notification": {
+    "show_full": true,
+    "show_threshold": false
+  },
   "charging_start": {
     "urgency": "Low",
     "enabled": false,
@@ -241,6 +273,7 @@ Full default configuration file:
   "charging_stop": {
     "urgency": "Low",
     "enabled": false,
+    "show_threshold_warning": true,
     "title": "Discharging",
     "message": "Unplugged at {}%"
   },
