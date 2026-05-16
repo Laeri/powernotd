@@ -34,6 +34,12 @@ pub struct Args {
     /// default (BAT0). Check '/sys/class/power_supply/' to see which batteries you have.
     #[arg(short = 'b', long)]
     pub battery: Option<String>,
+
+    /// Suppress the stderr warning printed when no desktop notification daemon
+    /// (dunst, mako, notification-daemon, xfce4-notifyd, ...) is reachable on D-Bus.
+    /// Notifications still attempt to fire; this only silences the diagnostic.
+    #[arg(long, default_value_t = false)]
+    pub mute_notification_warning: bool,
 }
 
 /// used within build.rs

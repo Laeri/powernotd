@@ -35,6 +35,7 @@ Register-ArgumentCompleter -Native -CommandName 'powernotd' -ScriptBlock {
             [CompletionResult]::new('--list-thresholds', '--list-thresholds', [CompletionResultType]::ParameterName, 'List all notification thresholds in the format ''a_1%, a_2%, ..., a_n%'' that are specified in the config-file')
             [CompletionResult]::new('-p', '-p', [CompletionResultType]::ParameterName, 'Display the path to the config-file')
             [CompletionResult]::new('--show-config-path', '--show-config-path', [CompletionResultType]::ParameterName, 'Display the path to the config-file')
+            [CompletionResult]::new('--mute-notification-warning', '--mute-notification-warning', [CompletionResultType]::ParameterName, 'Suppress the stderr warning printed when no desktop notification daemon (dunst, mako, notification-daemon, xfce4-notifyd, ...) is reachable on D-Bus. Notifications still attempt to fire; this only silences the diagnostic')
             [CompletionResult]::new('-h', '-h', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('--help', '--help', [CompletionResultType]::ParameterName, 'Print help')
             [CompletionResult]::new('-V', '-V ', [CompletionResultType]::ParameterName, 'Print version')

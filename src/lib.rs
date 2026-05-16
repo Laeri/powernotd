@@ -5,7 +5,16 @@ pub mod upower;
 use notification::{BatteryFullNotification, ChargingHook, Urgency};
 use std::fs::File;
 use std::io::prelude::*;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::{collections::HashMap, process::Command};
+
+static MUTE_NOTIFICATION_WARNING: AtomicBool = AtomicBool::new(false);
+
+/// Globally suppress the diagnostic emitted by `warn_notification_failure`.
+/// Intended to back the `--mute-notification-warning` CLI flag.
+pub fn set_mute_notification_warning(mute: bool) {
+    MUTE_NOTIFICATION_WARNING.store(mute, Ordering::Relaxed);
+}
 
 pub type Battery = str;
 
@@ -90,7 +99,12 @@ pub fn get_charging_status_text(battery: Option<&Battery>) -> String {
 }
 
 /// send a message using linux notify-send api
-pub fn send_message(title: &str, message: &str, urgency: &Urgency, time_secs: Option<u32>) {
+pub fn send_message(
+    title: &str,
+    message: &str,
+    urgency: &Urgency,
+    time_secs: Option<u32>,
+) -> notify_rust::error::Result<()> {
     let mut notification = notify_rust::Notification::new();
 
     notification
@@ -102,7 +116,21 @@ pub fn send_message(title: &str, message: &str, urgency: &Urgency, time_secs: Op
         notification.timeout(notify_rust::Timeout::Milliseconds(wait_time * 1000));
         //milliseconds
     }
-    notification.show().unwrap();
+    notification.show()?;
+    Ok(())
+}
+
+pub fn warn_notification_failure(err: &notify_rust::error::Error) {
+    if MUTE_NOTIFICATION_WARNING.load(Ordering::Relaxed) {
+        return;
+    }
+    eprintln!("Could not send desktop notification: {}", err);
+    eprintln!(
+        "Hint: powernotd needs a running notification daemon (e.g. dunst, mako, \
+         notification-daemon, xfce4-notifyd). Install and start one, or ensure it \
+         is launched before powernotd in your session/service ordering. \
+         Pass --mute-notification-warning to silence this message."
+    );
 }
 
 pub fn run_command(command: &str) {
@@ -145,12 +173,14 @@ pub fn send_notification(level: &u32, notification: &notification::Notification)
     let message = notification.message.clone().unwrap_or("{}".to_string());
     let percent = format!("{}", level);
 
-    send_message(
+    if let Err(err) = send_message(
         &title.replace("{}", &percent),
         &message.replace("{}", &percent),
         &notification.urgency,
         notification.time_secs,
-    );
+    ) {
+        warn_notification_failure(&err);
+    }
     if let Some(cmd) = &notification.command {
         run_command(cmd);
     }
@@ -168,12 +198,14 @@ pub fn fire_plugin_plugout_hook(level: u32, hook: &ChargingHook) {
             .unwrap_or_else(|| "Battery Status".to_string());
         let message = hook.message.clone().unwrap_or_else(|| "{}%".to_string());
         let percent = format!("{}", level);
-        send_message(
+        if let Err(err) = send_message(
             &title.replace("{}", &percent),
             &message.replace("{}", &percent),
             &hook.urgency,
             hook.time_secs,
-        );
+        ) {
+            warn_notification_failure(&err);
+        }
     }
     if let Some(cmd) = &hook.command {
         run_command(cmd);
@@ -183,7 +215,7 @@ pub fn fire_plugin_plugout_hook(level: u32, hook: &ChargingHook) {
 pub fn notify_now(level: &u32) {
     let percent = format!("{}%", level);
     let default_wait_time = 10; // seconds
-    send_message(
+    let _ = send_message(
         "Battery Status",
         &percent,
         &Urgency::Normal,
@@ -240,7 +272,9 @@ pub fn check_notify_full_battery(
         .clone()
         .unwrap_or("Fully Charged 100%".to_string());
     if *current >= 100 {
-        send_message(&title, &message, &full_notification.urgency, None);
+        if let Err(err) = send_message(&title, &message, &full_notification.urgency, None) {
+            warn_notification_failure(&err);
+        }
         if let Some(cmd) = &full_notification.command {
             run_command(cmd);
         }
