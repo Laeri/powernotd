@@ -11,6 +11,16 @@ use std::{thread, time};
 
 use powernotd::notification::{ChargingStartHook, ChargingStopHook, Notification};
 
+fn emit_default_config() {
+    match serde_json::to_string_pretty(&config::get_default_config()) {
+        Ok(json) => println!("{}", json),
+        Err(err) => {
+            eprintln!("Could not serialize default config: {}", err);
+            std::process::exit(1);
+        }
+    }
+}
+
 fn plugin_plugout_check_fallback(
     battery: Option<&Battery>,
     level: u32,
@@ -66,13 +76,7 @@ fn main() {
     }
 
     if args.emit_default_config {
-        match serde_json::to_string_pretty(&config::get_default_config()) {
-            Ok(json) => println!("{}", json),
-            Err(err) => {
-                eprintln!("Could not serialize default config: {}", err);
-                std::process::exit(1);
-            }
-        }
+        emit_default_config();
         return;
     }
 

@@ -17,28 +17,18 @@ fn default_poll_interval_secs() -> u32 {
     DEFAULT_POLL_INTERVAL_SECS
 }
 
-fn default_plugged_in_startup_show_full() -> bool {
-    true
-}
-
-fn default_plugged_in_startup_show_threshold() -> bool {
-    false
-}
-
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
+#[serde(default)]
 pub struct PluggedInStartupNotification {
-    #[serde(default = "default_plugged_in_startup_show_full")]
     pub show_full: bool,
-
-    #[serde(default = "default_plugged_in_startup_show_threshold")]
     pub show_threshold: bool,
 }
 
 impl Default for PluggedInStartupNotification {
     fn default() -> Self {
         Self {
-            show_full: default_plugged_in_startup_show_full(),
-            show_threshold: default_plugged_in_startup_show_threshold(),
+            show_full: true,
+            show_threshold: false,
         }
     }
 }
