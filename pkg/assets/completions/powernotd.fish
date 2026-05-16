@@ -5,6 +5,7 @@ complete -c powernotd -s c -l charging-state -d 'Print charging status \'chargin
 complete -c powernotd -s n -l notify-now -d 'Send desktop notification with current battery-level then exit'
 complete -c powernotd -s t -l list-thresholds -d 'List all notification thresholds in the format \'a_1%, a_2%, ..., a_n%\' that are specified in the config-file'
 complete -c powernotd -s p -l show-config-path -d 'Display the path to the config-file'
+complete -c powernotd -l emit-default-config -d 'Print the default configuration as JSON then exit'
 complete -c powernotd -l mute-notification-warning -d 'Suppress the stderr warning printed when no desktop notification daemon (dunst, mako, notification-daemon, xfce4-notifyd, ...) is reachable on D-Bus. Notifications still attempt to fire; this only silences the diagnostic'
 complete -c powernotd -s h -l help -d 'Print help'
 complete -c powernotd -s V -l version -d 'Print version'

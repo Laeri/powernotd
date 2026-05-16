@@ -4,7 +4,7 @@
 .SH NAME
 powernotd \- Powernotd is a battery\-level notification daemon that sends notification using the xdg desktop notification standard.
 .SH SYNOPSIS
-\fBpowernotd\fR [\fB\-s\fR|\fB\-\-status\-level\fR] [\fB\-c\fR|\fB\-\-charging\-state\fR] [\fB\-f\fR|\fB\-\-config\-file\fR] [\fB\-n\fR|\fB\-\-notify\-now\fR] [\fB\-t\fR|\fB\-\-list\-thresholds\fR] [\fB\-p\fR|\fB\-\-show\-config\-path\fR] [\fB\-b\fR|\fB\-\-battery\fR] [\fB\-\-mute\-notification\-warning\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] 
+\fBpowernotd\fR [\fB\-s\fR|\fB\-\-status\-level\fR] [\fB\-c\fR|\fB\-\-charging\-state\fR] [\fB\-f\fR|\fB\-\-config\-file\fR] [\fB\-n\fR|\fB\-\-notify\-now\fR] [\fB\-t\fR|\fB\-\-list\-thresholds\fR] [\fB\-p\fR|\fB\-\-show\-config\-path\fR] [\fB\-\-emit\-default\-config\fR] [\fB\-b\fR|\fB\-\-battery\fR] [\fB\-\-mute\-notification\-warning\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fB\-V\fR|\fB\-\-version\fR] 
 .SH DESCRIPTION
 Powernotd is a battery\-level notification daemon that sends notification using the xdg desktop notification standard.
 .SH OPTIONS
@@ -26,6 +26,9 @@ List all notification thresholds in the format \*(Aqa_1%, a_2%, ..., a_n%\*(Aq t
 .TP
 \fB\-p\fR, \fB\-\-show\-config\-path\fR
 Display the path to the config\-file
+.TP
+\fB\-\-emit\-default\-config\fR
+Print the default configuration as JSON then exit
 .TP
 \fB\-b\fR, \fB\-\-battery\fR \fI<BATTERY>\fR
 Pass the battery such as \*(AqBAT1\*(Aq if your system has multiple and you do not want to use the default (BAT0). Check \*(Aq/sys/class/power_supply/\*(Aq to see which batteries you have
