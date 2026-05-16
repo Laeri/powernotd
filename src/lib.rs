@@ -3,7 +3,7 @@ pub mod notification;
 pub mod upower;
 
 use config::PluggedInStartupNotification;
-use notification::{BatteryFullNotification, ChargingHook, Urgency};
+use notification::{BatteryFullNotification, ChargingHookBase, Urgency};
 use std::fs::File;
 use std::io::prelude::*;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -188,7 +188,7 @@ pub fn send_notification(level: &u32, notification: &notification::Notification)
 }
 
 // hook to fire notification / run command on plugin/plugout
-pub fn fire_plugin_plugout_hook(level: u32, hook: &ChargingHook) {
+pub fn fire_plugin_plugout_hook(level: u32, hook: &ChargingHookBase) {
     if !hook.enabled {
         return;
     }
@@ -601,8 +601,6 @@ mod tests {
         reset_other_notifications(&10, &mut map);
         assert!(map.is_empty());
     }
-
-    // ---- startup notification gating ------------------------------------
 
     fn plugged_startup(show_full: bool, show_threshold: bool) -> PluggedInStartupNotification {
         PluggedInStartupNotification {

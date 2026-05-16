@@ -3,7 +3,10 @@ use std::path::PathBuf;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 
-use crate::notification::{BatteryFullNotification, ChargingHook, Notification, Urgency};
+use crate::notification::{
+    BatteryFullNotification, ChargingHookBase, ChargingStartHook, ChargingStopHook, Notification,
+    Urgency,
+};
 
 pub const CRITICAL_WAIT_TIME_SECS: u32 = 10000;
 pub const DEFAULT_POLL_INTERVAL_SECS: u32 = 60;
@@ -51,12 +54,12 @@ pub struct Config {
     // Optional hook fired when the AC adapter is plugged in
     // (Discharging -> Charging or Discharging -> Full).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub charging_start: Option<ChargingHook>,
+    pub charging_start: Option<ChargingStartHook>,
 
     // Optional hook fired when the AC adapter is unplugged
     // (Charging/Full -> Discharging).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub charging_stop: Option<ChargingHook>,
+    pub charging_stop: Option<ChargingStopHook>,
 
     // How often the poll loop reads the battery (seconds). Also bounds how
     // quickly plug/unplug hooks fire when UPower is unavailable.
@@ -254,24 +257,27 @@ pub fn get_default_config() -> Config {
         message: Some("Fully Charged 100%".to_string()),
     };
 
-    let charging_start = ChargingHook {
-        urgency: Urgency::Low,
-        enabled: false,
-        time_secs: None,
-        command: None,
-        title: Some("Charging".to_string()),
-        message: Some("Plugged in at {}%".to_string()),
-        show_threshold_warning: false,
+    let charging_start = ChargingStartHook {
+        base: ChargingHookBase {
+            urgency: Urgency::Low,
+            enabled: false,
+            time_secs: None,
+            command: None,
+            title: Some("Charging".to_string()),
+            message: Some("Plugged in at {}%".to_string()),
+        },
     };
 
-    let charging_stop = ChargingHook {
-        urgency: Urgency::Low,
-        enabled: false,
-        time_secs: None,
-        command: None,
-        title: Some("Discharging".to_string()),
-        message: Some("Unplugged at {}%".to_string()),
-        show_threshold_warning: true,
+    let charging_stop = ChargingStopHook {
+        base: ChargingHookBase {
+            urgency: Urgency::Low,
+            enabled: false,
+            time_secs: None,
+            command: None,
+            title: Some("Discharging".to_string()),
+            message: Some("Unplugged at {}%".to_string()),
+        },
+        show_threshold_warning_on_unplug: true,
     };
 
     Config {
@@ -417,10 +423,9 @@ mod tests {
         let cfg = get_default_config();
         let start = cfg.charging_start.expect("charging_start present");
         let stop = cfg.charging_stop.expect("charging_stop present");
-        assert!(!start.enabled);
-        assert!(!stop.enabled);
-        assert!(!start.show_threshold_warning);
-        assert!(stop.show_threshold_warning);
+        assert!(!start.base.enabled);
+        assert!(!stop.base.enabled);
+        assert!(stop.show_threshold_warning_on_unplug);
     }
 
     #[test]
@@ -437,14 +442,12 @@ mod tests {
     }
 
     #[test]
-    fn get_default_config_serde_roundtrip_preserves_show_threshold_warning() {
+    fn get_default_config_serde_roundtrip_preserves_show_threshold_warning_on_unplug() {
         let cfg = get_default_config();
         let s = serde_json::to_string(&cfg).expect("serialize default config");
         let back: Config = serde_json::from_str(&s).expect("deserialize default config");
-        let start = back.charging_start.expect("charging_start present");
         let stop = back.charging_stop.expect("charging_stop present");
-        assert!(!start.show_threshold_warning);
-        assert!(stop.show_threshold_warning);
+        assert!(stop.show_threshold_warning_on_unplug);
     }
 
     #[test]
