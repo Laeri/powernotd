@@ -252,7 +252,7 @@ pub fn get_default_config() -> Config {
             urgency: Urgency::Low,
             enabled: false,
             time_secs: None,
-            command: None,
+            command: Some("paplay /usr/share/sounds/freedesktop/stereo/power-plug.oga".to_string()),
             title: Some("Charging".to_string()),
             message: Some("Plugged in at {}%".to_string()),
         },
@@ -263,7 +263,7 @@ pub fn get_default_config() -> Config {
             urgency: Urgency::Low,
             enabled: false,
             time_secs: None,
-            command: None,
+            command: Some("paplay /usr/share/sounds/freedesktop/stereo/power-unplug.oga".to_string()),
             title: Some("Discharging".to_string()),
             message: Some("Unplugged at {}%".to_string()),
         },
@@ -416,6 +416,27 @@ mod tests {
         assert!(!start.base.enabled);
         assert!(!stop.base.enabled);
         assert!(stop.show_threshold_warning_on_unplug);
+    }
+
+    #[test]
+    fn get_default_config_charging_hooks_have_example_commands() {
+        let cfg = get_default_config();
+        let start = cfg.charging_start.expect("charging_start present");
+        let stop = cfg.charging_stop.expect("charging_stop present");
+        assert!(start.base.command.is_some());
+        assert!(stop.base.command.is_some());
+        assert!(start
+            .base
+            .command
+            .as_ref()
+            .unwrap()
+            .contains("power-plug"));
+        assert!(stop
+            .base
+            .command
+            .as_ref()
+            .unwrap()
+            .contains("power-unplug"));
     }
 
     #[test]
