@@ -264,19 +264,21 @@ Full default configuration file:
     "show_full": true,
     "show_threshold": false
   },
-  "charging_start": {
-    "urgency": "Low",
-    "enabled": false,
-    "title": "Charging",
-    "message": "Plugged in at {}%"
-  },
-  "charging_stop": {
-    "urgency": "Low",
-    "enabled": false,
-    "show_threshold_warning": true,
-    "title": "Discharging",
-    "message": "Unplugged at {}%"
-  },
+   "charging_start": {
+     "urgency": "Low",
+     "enabled": false,
+     "command": "paplay /usr/share/sounds/freedesktop/stereo/power-plug.oga",
+     "title": "Charging",
+     "message": "Plugged in at {}%"
+   },
+   "charging_stop": {
+     "urgency": "Low",
+     "enabled": false,
+     "show_threshold_warning_on_unplug": true,
+     "command": "paplay /usr/share/sounds/freedesktop/stereo/power-unplug.oga",
+     "title": "Discharging",
+     "message": "Unplugged at {}%"
+   },
   "poll_interval_secs": 60
 }
 ```
